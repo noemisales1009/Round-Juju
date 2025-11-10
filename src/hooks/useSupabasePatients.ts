@@ -14,21 +14,29 @@ export const useSupabasePatients = () => {
     try {
       setLoading(true);
       
+      console.log('🔄 Iniciando carregamento de pacientes...');
+      
       // Buscar pacientes
       const { data: patientsData, error: patientsError } = await supabase
         .from('patients')
         .select('*')
         .order('bed_number');
 
-      if (patientsError) throw patientsError;
+      if (patientsError) {
+        console.error('❌ Erro ao buscar pacientes:', patientsError);
+        throw patientsError;
+      }
 
-      console.log('Pacientes do Supabase:', patientsData);
+      console.log('✅ Pacientes do Supabase:', patientsData);
 
       // Limpar e popular o mapa de UUIDs
       patientUuidMap.clear();
       (patientsData || []).forEach(p => {
+        console.log(`📌 Mapeando bed_number ${p.bed_number} -> UUID ${p.id}`);
         patientUuidMap.set(p.bed_number, p.id);
       });
+
+      console.log('🗺️ Mapa de pacientes:', Array.from(patientUuidMap.entries()));
 
       // Buscar dispositivos (não arquivados)
       const { data: devicesData, error: devicesError } = await supabase
@@ -37,9 +45,12 @@ export const useSupabasePatients = () => {
         .eq('is_archived', false)
         .order('created_at', { ascending: false });
 
-      if (devicesError) throw devicesError;
+      if (devicesError) {
+        console.error('❌ Erro ao buscar dispositivos:', devicesError);
+        throw devicesError;
+      }
 
-      console.log('Dispositivos do Supabase:', devicesData);
+      console.log('✅ Dispositivos do Supabase:', devicesData);
 
       // Buscar exames (não arquivados)
       const { data: examsData, error: examsError } = await supabase
@@ -48,7 +59,10 @@ export const useSupabasePatients = () => {
         .eq('is_archived', false)
         .order('date', { ascending: false });
 
-      if (examsError) throw examsError;
+      if (examsError) {
+        console.error('❌ Erro ao buscar exames:', examsError);
+        throw examsError;
+      }
 
       // Buscar medicações
       const { data: medicationsData, error: medicationsError } = await supabase
@@ -56,7 +70,10 @@ export const useSupabasePatients = () => {
         .select('*')
         .order('start_date', { ascending: false });
 
-      if (medicationsError) throw medicationsError;
+      if (medicationsError) {
+        console.error('❌ Erro ao buscar medicações:', medicationsError);
+        throw medicationsError;
+      }
 
       // Combinar dados
       const patientsWithRelations: Patient[] = (patientsData || []).map((p, index) => ({
@@ -97,10 +114,10 @@ export const useSupabasePatients = () => {
           })),
       }));
 
-      console.log('Pacientes processados:', patientsWithRelations);
+      console.log('✅ Pacientes processados:', patientsWithRelations);
       setPatients(patientsWithRelations);
     } catch (error) {
-      console.error('Erro ao carregar pacientes:', error);
+      console.error('❌ Erro ao carregar pacientes:', error);
     } finally {
       setLoading(false);
     }
@@ -113,47 +130,59 @@ export const useSupabasePatients = () => {
   // Adicionar dispositivo
   const addDeviceToPatient = async (patientId: number, device: Omit<Device, 'id'>) => {
     try {
+      console.log('🔵 Iniciando addDeviceToPatient...');
+      console.log('📝 patientId recebido:', patientId);
+      console.log('📝 device recebido:', device);
+      console.log('📝 Lista de pacientes atual:', patients);
+      
       const patient = patients.find(p => p.id === patientId);
+      
       if (!patient) {
-        console.error('Paciente não encontrado:', patientId);
+        console.error('❌ Paciente não encontrado na lista:', patientId);
+        console.error('📋 Pacientes disponíveis:', patients.map(p => ({ id: p.id, bedNumber: p.bedNumber })));
         throw new Error('Paciente não encontrado');
       }
+
+      console.log('✅ Paciente encontrado:', patient);
+      console.log('🔍 Buscando UUID para bed_number:', patient.bedNumber);
 
       // Buscar o UUID do paciente usando o bed_number
       const patientUuid = patientUuidMap.get(patient.bedNumber);
       
+      console.log('🗺️ Mapa atual:', Array.from(patientUuidMap.entries()));
+      console.log('🔑 UUID encontrado:', patientUuid);
+      
       if (!patientUuid) {
-        console.error('UUID do paciente não encontrado para bed_number:', patient.bedNumber);
+        console.error('❌ UUID do paciente não encontrado para bed_number:', patient.bedNumber);
         throw new Error('UUID do paciente não encontrado');
       }
 
-      console.log('Inserindo dispositivo:', {
+      const insertData = {
         patient_id: patientUuid,
         name: device.name,
         location: device.location,
         start_date: device.startDate,
-      });
+      };
+
+      console.log('📤 Inserindo dispositivo no Supabase:', insertData);
 
       const { data, error } = await supabase
         .from('devices')
-        .insert({
-          patient_id: patientUuid,
-          name: device.name,
-          location: device.location,
-          start_date: device.startDate,
-        })
+        .insert(insertData)
         .select()
         .single();
 
       if (error) {
-        console.error('Erro do Supabase ao inserir dispositivo:', error);
+        console.error('❌ Erro do Supabase ao inserir dispositivo:', error);
+        console.error('📋 Detalhes do erro:', JSON.stringify(error, null, 2));
         throw error;
       }
 
-      console.log('Dispositivo inserido com sucesso:', data);
+      console.log('✅ Dispositivo inserido com sucesso:', data);
+      console.log('🔄 Recarregando pacientes...');
       await loadPatients();
     } catch (error) {
-      console.error('Erro ao adicionar dispositivo:', error);
+      console.error('❌ Erro ao adicionar dispositivo:', error);
       throw error;
     }
   };
