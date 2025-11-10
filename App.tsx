@@ -919,12 +919,16 @@ const AddDeviceModal: React.FC<{ patientId: number; onClose: () => void;}> = ({ 
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if(!type || !location || !startDate) return;
+        if(!type || !location || !startDate) {
+            showNotification({ message: 'Preencha todos os campos.', type: 'error' });
+            return;
+        }
         try {
             await addDeviceToPatient(patientId, { name: type, location, startDate });
             showNotification({ message: 'Dispositivo cadastrado com sucesso!', type: 'success' });
             onClose();
         } catch (error) {
+            console.error('Erro ao cadastrar dispositivo:', error);
             showNotification({ message: 'Erro ao cadastrar dispositivo.', type: 'error' });
         }
     };
@@ -940,14 +944,14 @@ const AddDeviceModal: React.FC<{ patientId: number; onClose: () => void;}> = ({ 
                     <div>
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Tipo</label>
                         <select value={type} onChange={e => setType(e.target.value)} className="mt-1 block w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-slate-800 dark:text-slate-200">
-                            <option value="" disabled>Select...</option>
+                            <option value="" disabled>Selecione...</option>
                             {DEVICE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                     </div>
                      <div>
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Local</label>
                          <select value={location} onChange={e => setLocation(e.target.value)} className="mt-1 block w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-slate-800 dark:text-slate-200">
-                            <option value="" disabled>Select...</option>
+                            <option value="" disabled>Selecione...</option>
                             {DEVICE_LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
                         </select>
                     </div>
@@ -972,12 +976,16 @@ const AddExamModal: React.FC<{ patientId: number; onClose: () => void;}> = ({ pa
     
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if(!name || !date || !result) return;
+        if(!name || !date || !result) {
+            showNotification({ message: 'Preencha todos os campos obrigatórios.', type: 'error' });
+            return;
+        }
         try {
             await addExamToPatient(patientId, { name, date, result, observation });
             showNotification({ message: 'Exame cadastrado com sucesso!', type: 'success' });
             onClose();
         } catch (error) {
+            console.error('Erro ao cadastrar exame:', error);
             showNotification({ message: 'Erro ao cadastrar exame.', type: 'error' });
         }
     };
@@ -1029,6 +1037,7 @@ const EditExamModal: React.FC<{ exam: Exam; patientId: number; onClose: () => vo
             showNotification({ message: 'Exame atualizado com sucesso!', type: 'success' });
             onClose();
         } catch (error) {
+            console.error('Erro ao atualizar exame:', error);
             showNotification({ message: 'Erro ao atualizar exame.', type: 'error' });
         }
     };
@@ -1071,12 +1080,16 @@ const AddMedicationModal: React.FC<{ patientId: number; onClose: () => void;}> =
     
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if(!name || !dosage || !startDate) return;
+        if(!name || !dosage || !startDate) {
+            showNotification({ message: 'Preencha todos os campos.', type: 'error' });
+            return;
+        }
         try {
             await addMedicationToPatient(patientId, { name, dosage, startDate });
             showNotification({ message: 'Medicação cadastrada com sucesso!', type: 'success' });
             onClose();
         } catch (error) {
+            console.error('Erro ao cadastrar medicação:', error);
             showNotification({ message: 'Erro ao cadastrar medicação.', type: 'error' });
         }
     };
@@ -1120,6 +1133,7 @@ const AddRemovalDateModal: React.FC<{ deviceId: number, patientId: number, onClo
             showNotification({ message: 'Data de retirada registrada!', type: 'success' });
             onClose();
         } catch (error) {
+            console.error('Erro ao registrar data de retirada:', error);
             showNotification({ message: 'Erro ao registrar data de retirada.', type: 'error' });
         }
     };
@@ -1154,6 +1168,7 @@ const AddEndDateModal: React.FC<{ medicationId: number, patientId: number, onClo
             showNotification({ message: 'Data de fim registrada!', type: 'success' });
             onClose();
         } catch (error) {
+            console.error('Erro ao registrar data de fim:', error);
             showNotification({ message: 'Erro ao registrar data de fim.', type: 'error' });
         }
     };
