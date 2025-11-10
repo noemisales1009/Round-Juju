@@ -28,6 +28,7 @@ export const useSupabasePatients = () => {
       }
 
       console.log('✅ Pacientes do Supabase:', patientsData);
+      console.log('📊 Total de pacientes:', patientsData?.length || 0);
 
       // Limpar e popular o mapa de UUIDs
       patientUuidMap.clear();
@@ -51,6 +52,7 @@ export const useSupabasePatients = () => {
       }
 
       console.log('✅ Dispositivos do Supabase:', devicesData);
+      console.log('📊 Total de dispositivos:', devicesData?.length || 0);
 
       // Buscar exames (não arquivados)
       const { data: examsData, error: examsError } = await supabase
@@ -64,6 +66,9 @@ export const useSupabasePatients = () => {
         throw examsError;
       }
 
+      console.log('✅ Exames do Supabase:', examsData);
+      console.log('📊 Total de exames:', examsData?.length || 0);
+
       // Buscar medicações
       const { data: medicationsData, error: medicationsError } = await supabase
         .from('medications')
@@ -75,15 +80,12 @@ export const useSupabasePatients = () => {
         throw medicationsError;
       }
 
+      console.log('✅ Medicações do Supabase:', medicationsData);
+      console.log('📊 Total de medicações:', medicationsData?.length || 0);
+
       // Combinar dados
-      const patientsWithRelations: Patient[] = (patientsData || []).map((p, index) => ({
-        id: index + 1, // Usar índice sequencial
-        name: p.name,
-        bedNumber: p.bed_number,
-        motherName: p.mother_name,
-        dob: p.dob,
-        ctd: p.ctd,
-        devices: (devicesData || [])
+      const patientsWithRelations: Patient[] = (patientsData || []).map((p, index) => {
+        const patientDevices = (devicesData || [])
           .filter(d => d.patient_id === p.id)
           .map((d, dIndex) => ({
             id: dIndex + 1,
@@ -92,8 +94,9 @@ export const useSupabasePatients = () => {
             startDate: d.start_date,
             removalDate: d.removal_date || undefined,
             isArchived: d.is_archived || false,
-          })),
-        exams: (examsData || [])
+          }));
+
+        const patientExams = (examsData || [])
           .filter(e => e.patient_id === p.id)
           .map((e, eIndex) => ({
             id: eIndex + 1,
@@ -102,8 +105,9 @@ export const useSupabasePatients = () => {
             result: e.result as 'Pendente' | 'Normal' | 'Alterado',
             observation: e.observation || undefined,
             isArchived: e.is_archived || false,
-          })),
-        medications: (medicationsData || [])
+          }));
+
+        const patientMedications = (medicationsData || [])
           .filter(m => m.patient_id === p.id)
           .map((m, mIndex) => ({
             id: mIndex + 1,
@@ -111,19 +115,41 @@ export const useSupabasePatients = () => {
             dosage: m.dosage,
             startDate: m.start_date,
             endDate: m.end_date || undefined,
-          })),
-      }));
+          }));
+
+        console.log(`👤 Paciente ${p.name}:`, {
+          devices: patientDevices.length,
+          exams: patientExams.length,
+          medications: patientMedications.length
+        });
+
+        return {
+          id: index + 1, // Usar índice sequencial
+          name: p.name,
+          bedNumber: p.bed_number,
+          motherName: p.mother_name,
+          dob: p.dob,
+          ctd: p.ctd,
+          devices: patientDevices,
+          exams: patientExams,
+          medications: patientMedications,
+        };
+      });
 
       console.log('✅ Pacientes processados:', patientsWithRelations);
+      console.log('📊 Total final de pacientes:', patientsWithRelations.length);
+      
       setPatients(patientsWithRelations);
     } catch (error) {
       console.error('❌ Erro ao carregar pacientes:', error);
     } finally {
       setLoading(false);
+      console.log('✅ Carregamento finalizado');
     }
   };
 
   useEffect(() => {
+    console.log('🚀 Hook useSupabasePatients montado');
     loadPatients();
   }, []);
 
