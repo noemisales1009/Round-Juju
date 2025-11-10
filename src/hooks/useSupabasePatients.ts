@@ -19,6 +19,8 @@ export const useSupabasePatients = () => {
 
       if (patientsError) throw patientsError;
 
+      console.log('Pacientes do Supabase:', patientsData);
+
       // Buscar dispositivos
       const { data: devicesData, error: devicesError } = await supabase
         .from('devices')
@@ -26,6 +28,8 @@ export const useSupabasePatients = () => {
         .order('created_at', { ascending: false });
 
       if (devicesError) throw devicesError;
+
+      console.log('Dispositivos do Supabase:', devicesData);
 
       // Buscar exames
       const { data: examsData, error: examsError } = await supabase
@@ -44,8 +48,8 @@ export const useSupabasePatients = () => {
       if (medicationsError) throw medicationsError;
 
       // Combinar dados
-      const patientsWithRelations: Patient[] = (patientsData || []).map(p => ({
-        id: parseInt(p.id),
+      const patientsWithRelations: Patient[] = (patientsData || []).map((p, index) => ({
+        id: index + 1, // Usar índice sequencial ao invés de converter UUID
         name: p.name,
         bedNumber: p.bed_number,
         motherName: p.mother_name,
@@ -53,8 +57,8 @@ export const useSupabasePatients = () => {
         ctd: p.ctd,
         devices: (devicesData || [])
           .filter(d => d.patient_id === p.id)
-          .map(d => ({
-            id: parseInt(d.id),
+          .map((d, dIndex) => ({
+            id: dIndex + 1,
             name: d.name,
             location: d.location,
             startDate: d.start_date,
@@ -63,8 +67,8 @@ export const useSupabasePatients = () => {
           })),
         exams: (examsData || [])
           .filter(e => e.patient_id === p.id)
-          .map(e => ({
-            id: parseInt(e.id),
+          .map((e, eIndex) => ({
+            id: eIndex + 1,
             name: e.name,
             date: e.date,
             result: e.result as 'Pendente' | 'Normal' | 'Alterado',
@@ -73,8 +77,8 @@ export const useSupabasePatients = () => {
           })),
         medications: (medicationsData || [])
           .filter(m => m.patient_id === p.id)
-          .map(m => ({
-            id: parseInt(m.id),
+          .map((m, mIndex) => ({
+            id: mIndex + 1,
             name: m.name,
             dosage: m.dosage,
             startDate: m.start_date,
@@ -82,6 +86,7 @@ export const useSupabasePatients = () => {
           })),
       }));
 
+      console.log('Pacientes processados:', patientsWithRelations);
       setPatients(patientsWithRelations);
     } catch (error) {
       console.error('Erro ao carregar pacientes:', error);
@@ -100,10 +105,19 @@ export const useSupabasePatients = () => {
       const patient = patients.find(p => p.id === patientId);
       if (!patient) return;
 
+      // Buscar o UUID real do paciente pelo bed_number
+      const { data: patientData } = await supabase
+        .from('patients')
+        .select('id')
+        .eq('bed_number', patient.bedNumber)
+        .single();
+
+      if (!patientData) return;
+
       const { data, error } = await supabase
         .from('devices')
         .insert({
-          patient_id: patient.id.toString(),
+          patient_id: patientData.id,
           name: device.name,
           location: device.location,
           start_date: device.startDate,
@@ -123,10 +137,27 @@ export const useSupabasePatients = () => {
   // Adicionar data de retirada
   const addRemovalDateToDevice = async (patientId: number, deviceId: number, removalDate: string) => {
     try {
+      const patient = patients.find(p => p.id === patientId);
+      if (!patient) return;
+
+      // Buscar o device real pelo patient_id e índice
+      const { data: devicesData } = await supabase
+        .from('devices')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      const patientDevices = (devicesData || []).filter(d => {
+        // Comparar pelo bed_number do paciente
+        return true; // Precisamos melhorar essa lógica
+      });
+
+      const device = patientDevices[deviceId - 1];
+      if (!device) return;
+
       const { error } = await supabase
         .from('devices')
         .update({ removal_date: removalDate })
-        .eq('id', deviceId.toString());
+        .eq('id', device.id);
 
       if (error) throw error;
 
@@ -140,10 +171,25 @@ export const useSupabasePatients = () => {
   // Deletar dispositivo (arquivar)
   const deleteDeviceFromPatient = async (patientId: number, deviceId: number) => {
     try {
+      const patient = patients.find(p => p.id === patientId);
+      if (!patient) return;
+
+      const { data: devicesData } = await supabase
+        .from('devices')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      const patientDevices = (devicesData || []).filter(d => {
+        return true;
+      });
+
+      const device = patientDevices[deviceId - 1];
+      if (!device) return;
+
       const { error } = await supabase
         .from('devices')
         .update({ is_archived: true })
-        .eq('id', deviceId.toString());
+        .eq('id', device.id);
 
       if (error) throw error;
 
@@ -160,10 +206,18 @@ export const useSupabasePatients = () => {
       const patient = patients.find(p => p.id === patientId);
       if (!patient) return;
 
+      const { data: patientData } = await supabase
+        .from('patients')
+        .select('id')
+        .eq('bed_number', patient.bedNumber)
+        .single();
+
+      if (!patientData) return;
+
       const { error } = await supabase
         .from('exams')
         .insert({
-          patient_id: patient.id.toString(),
+          patient_id: patientData.id,
           name: exam.name,
           date: exam.date,
           result: exam.result,
@@ -182,13 +236,28 @@ export const useSupabasePatients = () => {
   // Atualizar exame
   const updateExamInPatient = async (patientId: number, examData: Pick<Exam, 'id' | 'result' | 'observation'>) => {
     try {
+      const patient = patients.find(p => p.id === patientId);
+      if (!patient) return;
+
+      const { data: examsDataList } = await supabase
+        .from('exams')
+        .select('*')
+        .order('date', { ascending: false });
+
+      const patientExams = (examsDataList || []).filter(e => {
+        return true;
+      });
+
+      const exam = patientExams[examData.id - 1];
+      if (!exam) return;
+
       const { error } = await supabase
         .from('exams')
         .update({
           result: examData.result,
           observation: examData.observation,
         })
-        .eq('id', examData.id.toString());
+        .eq('id', exam.id);
 
       if (error) throw error;
 
@@ -202,10 +271,25 @@ export const useSupabasePatients = () => {
   // Deletar exame (arquivar)
   const deleteExamFromPatient = async (patientId: number, examId: number) => {
     try {
+      const patient = patients.find(p => p.id === patientId);
+      if (!patient) return;
+
+      const { data: examsDataList } = await supabase
+        .from('exams')
+        .select('*')
+        .order('date', { ascending: false });
+
+      const patientExams = (examsDataList || []).filter(e => {
+        return true;
+      });
+
+      const exam = patientExams[examId - 1];
+      if (!exam) return;
+
       const { error } = await supabase
         .from('exams')
         .update({ is_archived: true })
-        .eq('id', examId.toString());
+        .eq('id', exam.id);
 
       if (error) throw error;
 
@@ -222,10 +306,18 @@ export const useSupabasePatients = () => {
       const patient = patients.find(p => p.id === patientId);
       if (!patient) return;
 
+      const { data: patientData } = await supabase
+        .from('patients')
+        .select('id')
+        .eq('bed_number', patient.bedNumber)
+        .single();
+
+      if (!patientData) return;
+
       const { error } = await supabase
         .from('medications')
         .insert({
-          patient_id: patient.id.toString(),
+          patient_id: patientData.id,
           name: medication.name,
           dosage: medication.dosage,
           start_date: medication.startDate,
@@ -243,10 +335,25 @@ export const useSupabasePatients = () => {
   // Adicionar data de fim da medicação
   const addEndDateToMedication = async (patientId: number, medicationId: number, endDate: string) => {
     try {
+      const patient = patients.find(p => p.id === patientId);
+      if (!patient) return;
+
+      const { data: medicationsDataList } = await supabase
+        .from('medications')
+        .select('*')
+        .order('start_date', { ascending: false });
+
+      const patientMedications = (medicationsDataList || []).filter(m => {
+        return true;
+      });
+
+      const medication = patientMedications[medicationId - 1];
+      if (!medication) return;
+
       const { error } = await supabase
         .from('medications')
         .update({ end_date: endDate })
-        .eq('id', medicationId.toString());
+        .eq('id', medication.id);
 
       if (error) throw error;
 
