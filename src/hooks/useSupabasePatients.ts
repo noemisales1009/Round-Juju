@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../integrations/supabase/client';
-import { Patient, Device, Exam, Medication } from '../types';
+import { Patient, Device, Exam, Medication } from '../../types';
 
 export const useSupabasePatients = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
