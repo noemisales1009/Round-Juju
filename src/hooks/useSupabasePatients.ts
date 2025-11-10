@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../integrations/supabase/client';
 import { Patient, Device, Exam, Medication } from '../../types';
 
+// Mapa para armazenar a relação entre bed_number e UUID
+const patientUuidMap = new Map<number, string>();
+
 export const useSupabasePatients = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,20 +24,28 @@ export const useSupabasePatients = () => {
 
       console.log('Pacientes do Supabase:', patientsData);
 
-      // Buscar dispositivos
+      // Limpar e popular o mapa de UUIDs
+      patientUuidMap.clear();
+      (patientsData || []).forEach(p => {
+        patientUuidMap.set(p.bed_number, p.id);
+      });
+
+      // Buscar dispositivos (não arquivados)
       const { data: devicesData, error: devicesError } = await supabase
         .from('devices')
         .select('*')
+        .eq('is_archived', false)
         .order('created_at', { ascending: false });
 
       if (devicesError) throw devicesError;
 
       console.log('Dispositivos do Supabase:', devicesData);
 
-      // Buscar exames
+      // Buscar exames (não arquivados)
       const { data: examsData, error: examsError } = await supabase
         .from('exams')
         .select('*')
+        .eq('is_archived', false)
         .order('date', { ascending: false });
 
       if (examsError) throw examsError;
@@ -49,7 +60,7 @@ export const useSupabasePatients = () => {
 
       // Combinar dados
       const patientsWithRelations: Patient[] = (patientsData || []).map((p, index) => ({
-        id: index + 1, // Usar índice sequencial ao invés de converter UUID
+        id: index + 1, // Usar índice sequencial
         name: p.name,
         bedNumber: p.bed_number,
         motherName: p.mother_name,
@@ -103,21 +114,30 @@ export const useSupabasePatients = () => {
   const addDeviceToPatient = async (patientId: number, device: Omit<Device, 'id'>) => {
     try {
       const patient = patients.find(p => p.id === patientId);
-      if (!patient) return;
+      if (!patient) {
+        console.error('Paciente não encontrado:', patientId);
+        throw new Error('Paciente não encontrado');
+      }
 
-      // Buscar o UUID real do paciente pelo bed_number
-      const { data: patientData } = await supabase
-        .from('patients')
-        .select('id')
-        .eq('bed_number', patient.bedNumber)
-        .single();
+      // Buscar o UUID do paciente usando o bed_number
+      const patientUuid = patientUuidMap.get(patient.bedNumber);
+      
+      if (!patientUuid) {
+        console.error('UUID do paciente não encontrado para bed_number:', patient.bedNumber);
+        throw new Error('UUID do paciente não encontrado');
+      }
 
-      if (!patientData) return;
+      console.log('Inserindo dispositivo:', {
+        patient_id: patientUuid,
+        name: device.name,
+        location: device.location,
+        start_date: device.startDate,
+      });
 
       const { data, error } = await supabase
         .from('devices')
         .insert({
-          patient_id: patientData.id,
+          patient_id: patientUuid,
           name: device.name,
           location: device.location,
           start_date: device.startDate,
@@ -125,8 +145,12 @@ export const useSupabasePatients = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Erro do Supabase ao inserir dispositivo:', error);
+        throw error;
+      }
 
+      console.log('Dispositivo inserido com sucesso:', data);
       await loadPatients();
     } catch (error) {
       console.error('Erro ao adicionar dispositivo:', error);
@@ -140,18 +164,18 @@ export const useSupabasePatients = () => {
       const patient = patients.find(p => p.id === patientId);
       if (!patient) return;
 
-      // Buscar o device real pelo patient_id e índice
+      const patientUuid = patientUuidMap.get(patient.bedNumber);
+      if (!patientUuid) return;
+
+      // Buscar todos os dispositivos do paciente
       const { data: devicesData } = await supabase
         .from('devices')
         .select('*')
+        .eq('patient_id', patientUuid)
+        .eq('is_archived', false)
         .order('created_at', { ascending: false });
 
-      const patientDevices = (devicesData || []).filter(d => {
-        // Comparar pelo bed_number do paciente
-        return true; // Precisamos melhorar essa lógica
-      });
-
-      const device = patientDevices[deviceId - 1];
+      const device = (devicesData || [])[deviceId - 1];
       if (!device) return;
 
       const { error } = await supabase
@@ -174,16 +198,17 @@ export const useSupabasePatients = () => {
       const patient = patients.find(p => p.id === patientId);
       if (!patient) return;
 
+      const patientUuid = patientUuidMap.get(patient.bedNumber);
+      if (!patientUuid) return;
+
       const { data: devicesData } = await supabase
         .from('devices')
         .select('*')
+        .eq('patient_id', patientUuid)
+        .eq('is_archived', false)
         .order('created_at', { ascending: false });
 
-      const patientDevices = (devicesData || []).filter(d => {
-        return true;
-      });
-
-      const device = patientDevices[deviceId - 1];
+      const device = (devicesData || [])[deviceId - 1];
       if (!device) return;
 
       const { error } = await supabase
@@ -206,18 +231,13 @@ export const useSupabasePatients = () => {
       const patient = patients.find(p => p.id === patientId);
       if (!patient) return;
 
-      const { data: patientData } = await supabase
-        .from('patients')
-        .select('id')
-        .eq('bed_number', patient.bedNumber)
-        .single();
-
-      if (!patientData) return;
+      const patientUuid = patientUuidMap.get(patient.bedNumber);
+      if (!patientUuid) return;
 
       const { error } = await supabase
         .from('exams')
         .insert({
-          patient_id: patientData.id,
+          patient_id: patientUuid,
           name: exam.name,
           date: exam.date,
           result: exam.result,
@@ -239,16 +259,17 @@ export const useSupabasePatients = () => {
       const patient = patients.find(p => p.id === patientId);
       if (!patient) return;
 
+      const patientUuid = patientUuidMap.get(patient.bedNumber);
+      if (!patientUuid) return;
+
       const { data: examsDataList } = await supabase
         .from('exams')
         .select('*')
+        .eq('patient_id', patientUuid)
+        .eq('is_archived', false)
         .order('date', { ascending: false });
 
-      const patientExams = (examsDataList || []).filter(e => {
-        return true;
-      });
-
-      const exam = patientExams[examData.id - 1];
+      const exam = (examsDataList || [])[examData.id - 1];
       if (!exam) return;
 
       const { error } = await supabase
@@ -274,16 +295,17 @@ export const useSupabasePatients = () => {
       const patient = patients.find(p => p.id === patientId);
       if (!patient) return;
 
+      const patientUuid = patientUuidMap.get(patient.bedNumber);
+      if (!patientUuid) return;
+
       const { data: examsDataList } = await supabase
         .from('exams')
         .select('*')
-        .order('date', { ascending: false });
+        .eq('patient_id', patientUuid)
+        .eq('is_archived', false)
+        .order('date', { ascending: false});
 
-      const patientExams = (examsDataList || []).filter(e => {
-        return true;
-      });
-
-      const exam = patientExams[examId - 1];
+      const exam = (examsDataList || [])[examId - 1];
       if (!exam) return;
 
       const { error } = await supabase
@@ -306,18 +328,13 @@ export const useSupabasePatients = () => {
       const patient = patients.find(p => p.id === patientId);
       if (!patient) return;
 
-      const { data: patientData } = await supabase
-        .from('patients')
-        .select('id')
-        .eq('bed_number', patient.bedNumber)
-        .single();
-
-      if (!patientData) return;
+      const patientUuid = patientUuidMap.get(patient.bedNumber);
+      if (!patientUuid) return;
 
       const { error } = await supabase
         .from('medications')
         .insert({
-          patient_id: patientData.id,
+          patient_id: patientUuid,
           name: medication.name,
           dosage: medication.dosage,
           start_date: medication.startDate,
@@ -338,16 +355,16 @@ export const useSupabasePatients = () => {
       const patient = patients.find(p => p.id === patientId);
       if (!patient) return;
 
+      const patientUuid = patientUuidMap.get(patient.bedNumber);
+      if (!patientUuid) return;
+
       const { data: medicationsDataList } = await supabase
         .from('medications')
         .select('*')
+        .eq('patient_id', patientUuid)
         .order('start_date', { ascending: false });
 
-      const patientMedications = (medicationsDataList || []).filter(m => {
-        return true;
-      });
-
-      const medication = patientMedications[medicationId - 1];
+      const medication = (medicationsDataList || [])[medicationId - 1];
       if (!medication) return;
 
       const { error } = await supabase
