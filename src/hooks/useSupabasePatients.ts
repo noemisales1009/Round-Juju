@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../integrations/supabase/client';
-import { Patient, Device, Exam, Medication } from '../../types';
+import type { Patient, Device, Exam, Medication } from '../../types';
 
 // Mapa para armazenar a relação entre bed_number e UUID
 const patientUuidMap = new Map<number, string>();
@@ -124,7 +124,7 @@ export const useSupabasePatients = () => {
         });
 
         return {
-          id: index + 1, // Usar índice sequencial
+          id: index + 1,
           name: p.name,
           bedNumber: p.bed_number,
           motherName: p.mother_name,
@@ -153,7 +153,6 @@ export const useSupabasePatients = () => {
     loadPatients();
   }, []);
 
-  // Adicionar dispositivo
   const addDeviceToPatient = async (patientId: number, device: Omit<Device, 'id'>) => {
     try {
       console.log('🔵 Iniciando addDeviceToPatient...');
@@ -172,7 +171,6 @@ export const useSupabasePatients = () => {
       console.log('✅ Paciente encontrado:', patient);
       console.log('🔍 Buscando UUID para bed_number:', patient.bedNumber);
 
-      // Buscar o UUID do paciente usando o bed_number
       const patientUuid = patientUuidMap.get(patient.bedNumber);
       
       console.log('🗺️ Mapa atual:', Array.from(patientUuidMap.entries()));
@@ -213,7 +211,6 @@ export const useSupabasePatients = () => {
     }
   };
 
-  // Adicionar data de retirada
   const addRemovalDateToDevice = async (patientId: number, deviceId: number, removalDate: string) => {
     try {
       const patient = patients.find(p => p.id === patientId);
@@ -222,7 +219,6 @@ export const useSupabasePatients = () => {
       const patientUuid = patientUuidMap.get(patient.bedNumber);
       if (!patientUuid) return;
 
-      // Buscar todos os dispositivos do paciente
       const { data: devicesData } = await supabase
         .from('devices')
         .select('*')
@@ -247,7 +243,6 @@ export const useSupabasePatients = () => {
     }
   };
 
-  // Deletar dispositivo (arquivar)
   const deleteDeviceFromPatient = async (patientId: number, deviceId: number) => {
     try {
       const patient = patients.find(p => p.id === patientId);
@@ -280,7 +275,6 @@ export const useSupabasePatients = () => {
     }
   };
 
-  // Adicionar exame
   const addExamToPatient = async (patientId: number, exam: Omit<Exam, 'id'>) => {
     try {
       const patient = patients.find(p => p.id === patientId);
@@ -308,7 +302,6 @@ export const useSupabasePatients = () => {
     }
   };
 
-  // Atualizar exame
   const updateExamInPatient = async (patientId: number, examData: Pick<Exam, 'id' | 'result' | 'observation'>) => {
     try {
       const patient = patients.find(p => p.id === patientId);
@@ -344,7 +337,6 @@ export const useSupabasePatients = () => {
     }
   };
 
-  // Deletar exame (arquivar)
   const deleteExamFromPatient = async (patientId: number, examId: number) => {
     try {
       const patient = patients.find(p => p.id === patientId);
@@ -377,7 +369,6 @@ export const useSupabasePatients = () => {
     }
   };
 
-  // Adicionar medicação
   const addMedicationToPatient = async (patientId: number, medication: Omit<Medication, 'id'>) => {
     try {
       const patient = patients.find(p => p.id === patientId);
@@ -404,7 +395,6 @@ export const useSupabasePatients = () => {
     }
   };
 
-  // Adicionar data de fim da medicação
   const addEndDateToMedication = async (patientId: number, medicationId: number, endDate: string) => {
     try {
       const patient = patients.find(p => p.id === patientId);
