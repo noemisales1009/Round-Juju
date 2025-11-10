@@ -1,14 +1,9 @@
-
-
-
-
-
-
 import React, { useState, useMemo, useContext, useEffect, createContext, useRef } from 'react';
 import { HashRouter, Routes, Route, useNavigate, Link, useParams, useLocation, Outlet, NavLink } from 'react-router-dom';
 import { Patient, Category, Question, ChecklistAnswer, Answer, Device, Exam, Medication, Task, TaskStatus, PatientsContextType, TasksContextType, NotificationState, NotificationContextType, User, UserContextType, Theme, ThemeContextType } from './types';
 import { PATIENTS as initialPatients, CATEGORIES, QUESTIONS, TASKS as initialTasks, DEVICE_TYPES, DEVICE_LOCATIONS, EXAM_STATUSES, RESPONSIBLES, ALERT_DEADLINES, INITIAL_USER } from './constants';
 import { BackArrowIcon, PlusIcon, WarningIcon, ClockIcon, AlertIcon, CheckCircleIcon, BedIcon, UserIcon, PencilIcon, BellIcon, InfoIcon, EyeOffIcon, ClipboardIcon, FileTextIcon, LogOutIcon, ChevronRightIcon, MenuIcon, DashboardIcon, CpuIcon, PillIcon, BarChartIcon, AppleIcon, DropletIcon, HeartPulseIcon, BeakerIcon, LiverIcon, LungsIcon, DumbbellIcon, BrainIcon, ShieldIcon, UsersIcon, HomeIcon, CloseIcon, SettingsIcon, CameraIcon } from './components/icons';
+import { useSupabasePatients } from './hooks/useSupabasePatients';
 
 // --- CONTEXT for Global State ---
 const TasksContext = createContext<TasksContextType | null>(null);
@@ -155,9 +150,9 @@ const Header: React.FC<{ title: string; onMenuClick: () => void }> = ({ title, o
             }
             if(pathParts.includes('create-alert')) {
                  if(pathParts.includes('category')) {
-                    return `/patient/${pathParts[1]}/round/category/${pathParts[3]}`; // Go back to checklist
+                    return `/patient/${pathParts[1]}/round/category/${pathParts[3]}`;
                  }
-                 return `/patient/${pathParts[1]}`; // Go back to patient detail
+                 return `/patient/${pathParts[1]}`;
             }
             if (pathParts.includes('category')) {
                 return `/patient/${pathParts[1]}/round/categories`;
@@ -279,7 +274,6 @@ const LoginScreen: React.FC = () => {
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
-        // For now, any input allows login
         navigate('/dashboard');
     };
 
@@ -345,15 +339,11 @@ const DashboardScreen: React.FC = () => {
     }, [tasks]);
 
     const alertChartData = useMemo(() => {
-        // Fix: The accumulator's record key type was changed from number to string.
-        // This aligns with JavaScript's behavior where object keys are strings,
-        // ensuring Object.entries provides correct types and fixing subsequent arithmetic errors.
         const counts = tasks.filter(t => t.status === 'alerta').reduce((acc, task) => {
             acc[task.categoryId] = (acc[task.categoryId] || 0) + 1;
             return acc;
         }, {} as Record<string, number>);
 
-        // FIX: Explicitly cast the result of `Object.entries` to `[string, number][]`. This ensures TypeScript correctly infers `count` variables as numbers, resolving multiple downstream arithmetic errors.
         const sorted = (Object.entries(counts) as [string, number][]).sort(([, countA], [, countB]) => countB - countA);
         const maxCount = Math.max(...sorted.map(([, count]) => count), 0);
         
@@ -411,7 +401,7 @@ const DashboardScreen: React.FC = () => {
 
 const PatientListScreen: React.FC = () => {
     useHeader('Leitos');
-    const { patients } = useContext(PatientsContext)!;
+    const { patients, loading } = useContext(PatientsContext)!;
     const [searchTerm, setSearchTerm] = useState('');
 
     const filteredPatients = useMemo(() => {
@@ -425,6 +415,10 @@ const PatientListScreen: React.FC = () => {
         const completed = getCompletedCategoriesForPatient(patientId.toString());
         return (completed.length / CATEGORIES.length) * 100;
     };
+
+    if (loading) {
+        return <div className="text-center py-8 text-slate-500 dark:text-slate-400">Carregando pacientes...</div>;
+    }
 
     return (
         <div className="space-y-4">
@@ -605,7 +599,6 @@ const PatientHistoryScreen: React.FC = () => {
             <div class="history-group">
                 <h3>${formatHistoryDate(date)}</h3>
                 <ul>
-                    {/* Cast eventsOnDate to TimelineEvent[] as type inference struggles with the union type of patientHistory. */}
                     ${(eventsOnDate as TimelineEvent[]).map(event => `
                         <li>
                             ${event.hasTime ? `[${new Date(event.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}] ` : ''}
@@ -924,12 +917,16 @@ const AddDeviceModal: React.FC<{ patientId: number; onClose: () => void;}> = ({ 
     const [location, setLocation] = useState('');
     const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if(!type || !location || !startDate) return;
-        addDeviceToPatient(patientId, { name: type, location, startDate });
-        showNotification({ message: 'Dispositivo cadastrado com sucesso!', type: 'success' });
-        onClose();
+        try {
+            await addDeviceToPatient(patientId, { name: type, location, startDate });
+            showNotification({ message: 'Dispositivo cadastrado com sucesso!', type: 'success' });
+            onClose();
+        } catch (error) {
+            showNotification({ message: 'Erro ao cadastrar dispositivo.', type: 'error' });
+        }
     };
 
     return (
@@ -944,7 +941,6 @@ const AddDeviceModal: React.FC<{ patientId: number; onClose: () => void;}> = ({ 
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Tipo</label>
                         <select value={type} onChange={e => setType(e.target.value)} className="mt-1 block w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-slate-800 dark:text-slate-200">
                             <option value="" disabled>Select...</option>
-                            {/* Removed redundant type cast as DEVICE_TYPES is already string[] */}
                             {DEVICE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                     </div>
@@ -974,12 +970,16 @@ const AddExamModal: React.FC<{ patientId: number; onClose: () => void;}> = ({ pa
     const [result, setResult] = useState<'Pendente' | 'Normal' | 'Alterado'>('Pendente');
     const [observation, setObservation] = useState('');
     
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if(!name || !date || !result) return;
-        addExamToPatient(patientId, { name, date, result, observation });
-        showNotification({ message: 'Exame cadastrado com sucesso!', type: 'success' });
-        onClose();
+        try {
+            await addExamToPatient(patientId, { name, date, result, observation });
+            showNotification({ message: 'Exame cadastrado com sucesso!', type: 'success' });
+            onClose();
+        } catch (error) {
+            showNotification({ message: 'Erro ao cadastrar exame.', type: 'error' });
+        }
     };
 
     return (
@@ -1022,11 +1022,15 @@ const EditExamModal: React.FC<{ exam: Exam; patientId: number; onClose: () => vo
     const [result, setResult] = useState(exam.result);
     const [observation, setObservation] = useState(exam.observation || '');
     
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        updateExamInPatient(patientId, { id: exam.id, result, observation });
-        showNotification({ message: 'Exame atualizado com sucesso!', type: 'success' });
-        onClose();
+        try {
+            await updateExamInPatient(patientId, { id: exam.id, result, observation });
+            showNotification({ message: 'Exame atualizado com sucesso!', type: 'success' });
+            onClose();
+        } catch (error) {
+            showNotification({ message: 'Erro ao atualizar exame.', type: 'error' });
+        }
     };
 
     return (
@@ -1065,12 +1069,16 @@ const AddMedicationModal: React.FC<{ patientId: number; onClose: () => void;}> =
     const [dosage, setDosage] = useState('');
     const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
     
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if(!name || !dosage || !startDate) return;
-        addMedicationToPatient(patientId, { name, dosage, startDate });
-        showNotification({ message: 'Medicação cadastrada com sucesso!', type: 'success' });
-        onClose();
+        try {
+            await addMedicationToPatient(patientId, { name, dosage, startDate });
+            showNotification({ message: 'Medicação cadastrada com sucesso!', type: 'success' });
+            onClose();
+        } catch (error) {
+            showNotification({ message: 'Erro ao cadastrar medicação.', type: 'error' });
+        }
     };
 
     return (
@@ -1102,12 +1110,18 @@ const AddMedicationModal: React.FC<{ patientId: number; onClose: () => void;}> =
 
 const AddRemovalDateModal: React.FC<{ deviceId: number, patientId: number, onClose: () => void }> = ({ deviceId, patientId, onClose }) => {
     const { addRemovalDateToDevice } = useContext(PatientsContext)!;
+    const { showNotification } = useContext(NotificationContext)!;
     const [removalDate, setRemovalDate] = useState(new Date().toISOString().split('T')[0]);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        addRemovalDateToDevice(patientId, deviceId, removalDate);
-        onClose();
+        try {
+            await addRemovalDateToDevice(patientId, deviceId, removalDate);
+            showNotification({ message: 'Data de retirada registrada!', type: 'success' });
+            onClose();
+        } catch (error) {
+            showNotification({ message: 'Erro ao registrar data de retirada.', type: 'error' });
+        }
     };
 
     return (
@@ -1130,12 +1144,18 @@ const AddRemovalDateModal: React.FC<{ deviceId: number, patientId: number, onClo
 };
 const AddEndDateModal: React.FC<{ medicationId: number, patientId: number, onClose: () => void }> = ({ medicationId, patientId, onClose }) => {
     const { addEndDateToMedication } = useContext(PatientsContext)!;
+    const { showNotification } = useContext(NotificationContext)!;
     const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        addEndDateToMedication(patientId, medicationId, endDate);
-        onClose();
+        try {
+            await addEndDateToMedication(patientId, medicationId, endDate);
+            showNotification({ message: 'Data de fim registrada!', type: 'success' });
+            onClose();
+        } catch (error) {
+            showNotification({ message: 'Erro ao registrar data de fim.', type: 'error' });
+        }
     };
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-30">
@@ -1319,7 +1339,7 @@ const CreateAlertScreen: React.FC = () => {
 
         addTask({
             patientId: parseInt(patientId),
-            categoryId: category ? category.id : 0, // 0 for general alerts
+            categoryId: category ? category.id : 0,
             description,
             responsible,
             deadline: deadlineDate,
@@ -1586,107 +1606,9 @@ const SettingsScreen: React.FC = () => {
 // --- PROVIDERS for Global State ---
 
 const PatientsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [patients, setPatients] = useState<Patient[]>(initialPatients);
+    const supabaseHook = useSupabasePatients();
 
-    const addDeviceToPatient = (patientId: number, device: Omit<Device, 'id'>) => {
-        const newDevice = { ...device, id: Date.now() };
-        setPatients(prevPatients => prevPatients.map(p => 
-            p.id === patientId ? { ...p, devices: [...p.devices, newDevice] } : p
-        ));
-    };
-
-    const addExamToPatient = (patientId: number, exam: Omit<Exam, 'id'>) => {
-        const newExam = { ...exam, id: Date.now() };
-        setPatients(prevPatients => prevPatients.map(p => 
-            p.id === patientId ? { ...p, exams: [...p.exams, newExam] } : p
-        ));
-    };
-
-    const addMedicationToPatient = (patientId: number, medication: Omit<Medication, 'id'>) => {
-        const newMedication = { ...medication, id: Date.now() };
-        setPatients(prevPatients => prevPatients.map(p => 
-            p.id === patientId ? { ...p, medications: [...p.medications, newMedication] } : p
-        ));
-    };
-
-    const addRemovalDateToDevice = (patientId: number, deviceId: number, removalDate: string) => {
-        setPatients(prevPatients => prevPatients.map(p => {
-            if (p.id === patientId) {
-                return {
-                    ...p,
-                    devices: p.devices.map(d => d.id === deviceId ? { ...d, removalDate } : d)
-                };
-            }
-            return p;
-        }));
-    };
-    
-    const deleteDeviceFromPatient = (patientId: number, deviceId: number) => {
-        setPatients(prevPatients => prevPatients.map(p => {
-            if (p.id === patientId) {
-                return {
-                    ...p,
-                    devices: p.devices.map(d => d.id === deviceId ? { ...d, isArchived: true } : d)
-                };
-            }
-            return p;
-        }));
-    };
-
-    const addEndDateToMedication = (patientId: number, medicationId: number, endDate: string) => {
-        setPatients(prevPatients => prevPatients.map(p => {
-            if (p.id === patientId) {
-                return {
-                    ...p,
-                    medications: p.medications.map(m => m.id === medicationId ? { ...m, endDate } : m)
-                };
-            }
-            return p;
-        }));
-    };
-    
-    const updateExamInPatient = (patientId: number, examData: Pick<Exam, 'id' | 'result' | 'observation'>) => {
-        setPatients(prevPatients => prevPatients.map(p => {
-            if (p.id === patientId) {
-                return {
-                    ...p,
-                    exams: p.exams.map(e =>
-                        e.id === examData.id
-                        ? { ...e, result: examData.result, observation: examData.observation || undefined }
-                        : e
-                    )
-                };
-            }
-            return p;
-        }));
-    };
-
-    const deleteExamFromPatient = (patientId: number, examId: number) => {
-        setPatients(prevPatients => prevPatients.map(p => {
-            if (p.id === patientId) {
-                return {
-                    ...p,
-                    exams: p.exams.map(e => e.id === examId ? { ...e, isArchived: true } : e)
-                };
-            }
-            return p;
-        }));
-    };
-
-
-    const value = {
-        patients,
-        addDeviceToPatient,
-        addExamToPatient,
-        addMedicationToPatient,
-        addRemovalDateToDevice,
-        deleteDeviceFromPatient,
-        addEndDateToMedication,
-        updateExamInPatient,
-        deleteExamFromPatient,
-    };
-
-    return <PatientsContext.Provider value={value as PatientsContextType}>{children}</PatientsContext.Provider>;
+    return <PatientsContext.Provider value={supabaseHook as PatientsContextType}>{children}</PatientsContext.Provider>;
 };
 
 
