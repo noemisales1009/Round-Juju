@@ -50,8 +50,9 @@ export interface Category {
 
 export interface Question {
   id: number;
-  text: string;
-  categoryId: number;
+  texto: string; // Changed from 'text' to 'texto' to match DB schema
+  category_id: number; // Changed from 'categoryId' to 'category_id' to match DB schema
+  ordem: number;
 }
 
 export type Answer = 'sim' | 'não' | 'nao_se_aplica';
@@ -123,6 +124,12 @@ export interface PatientsContextType {
     deleteExamFromPatient: (patientId: string, examId: string) => void;
     updatePatientDetails: (patientId: string, details: Pick<Patient, 'motherName' | 'ctd'>) => void;
     loading: boolean;
+}
+
+export interface QuestionsContextType {
+    questions: Question[];
+    loading: boolean;
+    getQuestionsByCategoryId: (categoryId: number) => Question[];
 }
 
 export interface ChecklistContextType {

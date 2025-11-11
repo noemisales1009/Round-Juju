@@ -1,4 +1,4 @@
-import { Category, Question, User } from './types';
+import { Category, User } from './types';
 import { 
     AppleIcon, 
     DropletIcon,
@@ -31,24 +31,6 @@ export const CATEGORIES: Category[] = [
   { id: 10, name: 'Gerenciamento de Risco', icon: ShieldIcon },
   { id: 11, name: 'Família', icon: UsersIcon },
   { id: 12, name: 'Avaliação de Alta', icon: HomeIcon },
-];
-
-export const QUESTIONS: Question[] = [
-  // Sistema Nutricional
-  { id: 1, categoryId: 1, text: 'NUTRIÇÃO ADEQUADA? (INICIAR ORAL/ENTERAL/NPT)' },
-  { id: 2, categoryId: 1, text: 'TOLERÂNCIA À ALIMENTAÇÃO (VÔMITOS)?' },
-  { id: 3, categoryId: 1, text: 'RELATA DIARRÉIA OU CONSTIPAÇÃO?' },
-  { id: 4, categoryId: 1, text: 'GLICEMIA CONTROLADA? (DX 60-150)' },
-  { id: 5, categoryId: 1, text: 'NECESSIDADE DE PROFILAXIA PARA ÚLCERA DE ESTRESSE?' },
-  { id: 6, categoryId: 1, text: 'NECESSIDADE DE CONTROLE DE RESÍDUO GÁSTRICO?' },
-  { id: 7, categoryId: 1, text: 'FIXAÇÃO DE SNGE/SNE OK?' },
-  { id: 8, categoryId: 1, text: 'NECESSIDADE DE RX DE ABDOMEN PARA CHECAR SONDA?' },
-  // Hídrico
-  { id: 9, categoryId: 2, text: 'HÁ SINAIS DE SOBRECARGA HÍDRICA CLÍNICA?' },
-  { id: 10, categoryId: 2, text: 'BH POSITIVO >3% NAS ÚLTIMAS 24 HORAS?' },
-  // Hemodinâmico
-  { id: 11, categoryId: 3, text: 'APARELHO DE PANI ADEQUADO?' },
-  // ... add more questions for other categories
 ];
 
 export const RESPONSIBLES: string[] = [

@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useContext, useEffect, createContext, useRef } from 'react';
 import { HashRouter, Routes, Route, useNavigate, Link, useParams, useLocation, Outlet, NavLink, Navigate } from 'react-router-dom';
-import { Patient, Category, Question, ChecklistAnswer, Answer, Device, Exam, Medication, Task, TaskStatus, PatientsContextType, TasksContextType, NotificationState, NotificationContextType, User, UserContextType, Theme, ThemeContextType, DbChecklistAnswer, ChecklistContextType } from './types';
-import { CATEGORIES, QUESTIONS, DEVICE_TYPES, DEVICE_LOCATIONS, EXAM_STATUSES, RESPONSIBLES, ALERT_DEADLINES, INITIAL_USER } from './constants';
+import { Patient, Category, Question, ChecklistAnswer, Answer, Device, Exam, Medication, Task, TaskStatus, PatientsContextType, TasksContextType, NotificationState, NotificationContextType, User, UserContextType, Theme, ThemeContextType, DbChecklistAnswer, ChecklistContextType, QuestionsContextType } from './types';
+import { CATEGORIES, DEVICE_TYPES, DEVICE_LOCATIONS, EXAM_STATUSES, RESPONSIBLES, ALERT_DEADLINES, INITIAL_USER } from './constants';
 import { BackArrowIcon, PlusIcon, WarningIcon, ClockIcon, AlertIcon, CheckCircleIcon, BedIcon, UserIcon, PencilIcon, BellIcon, InfoIcon, EyeOffIcon, ClipboardIcon, FileTextIcon, LogOutIcon, ChevronRightIcon, MenuIcon, DashboardIcon, CpuIcon, PillIcon, BarChartIcon, AppleIcon, DropletIcon, HeartPulseIcon, BeakerIcon, LiverIcon, LungsIcon, DumbbellIcon, BrainIcon, ShieldIcon, UsersIcon, HomeIcon, CloseIcon, SettingsIcon, CameraIcon } from './components/icons';
 import { supabase } from './src/integrations/supabase/client';
 import type { Session } from '@supabase/supabase-js';
@@ -13,6 +13,7 @@ const NotificationContext = createContext<NotificationContextType | null>(null);
 const UserContext = createContext<UserContextType | null>(null);
 const ThemeContext = createContext<ThemeContextType | null>(null);
 const ChecklistContext = createContext<ChecklistContextType | null>(null);
+const QuestionsContext = createContext<QuestionsContextType | null>(null);
 
 
 // --- LAYOUT & NAVIGATION ---
@@ -1058,14 +1059,14 @@ const AddDeviceModal: React.FC<{ patientId: string; onClose: () => void;}> = ({ 
                     </div>
                      <div>
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Local</label>
-                         <select value={location} onChange={e => setLocation(e.target.value)} className="mt-1 block w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-slate-800 dark:text-slate-200">
+                         <select value={location} onChange={e => setLocation(e.target.value)} className="mt-1 block w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-800 dark:text-slate-200">
                             <option value="" disabled>Select...</option>
                             {DEVICE_LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
                         </select>
                     </div>
                      <div>
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Dia da inserção</label>
-                        <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="mt-1 block w-full border border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200" />
+                        <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="mt-1 block w-full border border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200" />
                     </div>
                     <button type="submit" className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Cadastrar</button>
                 </form>
@@ -1100,21 +1101,21 @@ const AddExamModal: React.FC<{ patientId: string; onClose: () => void;}> = ({ pa
                 <form onSubmit={handleSubmit} className="space-y-4">
                      <div>
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Exame</label>
-                        <input type="text" placeholder="Ex: Hemograma" value={name} onChange={e => setName(e.target.value)} className="mt-1 block w-full border bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-slate-800 dark:text-slate-200" />
+                        <input type="text" placeholder="Ex: Hemograma" value={name} onChange={e => setName(e.target.value)} className="mt-1 block w-full border bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-800 dark:text-slate-200" />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Data</label>
-                        <input type="date" value={date} onChange={e => setDate(e.target.value)} className="mt-1 block w-full border border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200" />
+                        <input type="date" value={date} onChange={e => setDate(e.target.value)} className="mt-1 block w-full border border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200" />
                     </div>
                      <div>
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Status</label>
-                         <select value={result} onChange={e => setResult(e.target.value as any)} className="mt-1 block w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-slate-800 dark:text-slate-200">
+                         <select value={result} onChange={e => setResult(e.target.value as any)} className="mt-1 block w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-800 dark:text-slate-200">
                             {EXAM_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Observação (Opcional)</label>
-                        <textarea value={observation} onChange={e => setObservation(e.target.value)} placeholder="Digite aqui..." className="mt-1 block w-full border bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-slate-800 dark:text-slate-200" rows={3}></textarea>
+                        <textarea value={observation} onChange={e => setObservation(e.target.value)} placeholder="Digite aqui..." className="mt-1 block w-full border bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-800 dark:text-slate-200" rows={3}></textarea>
                     </div>
                     <button type="submit" className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Cadastrar</button>
                 </form>
@@ -1157,7 +1158,7 @@ const EditExamModal: React.FC<{ exam: Exam; patientId: string; onClose: () => vo
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Observação (Opcional)</label>
-                        <textarea value={observation} onChange={e => setObservation(e.target.value)} placeholder="Digite aqui..." className="mt-1 block w-full border bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-slate-800 dark:text-slate-200" rows={3}></textarea>
+                        <textarea value={observation} onChange={e => setObservation(e.target.value)} placeholder="Digite aqui..." className="mt-1 block w-full border bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-800 dark:text-slate-200" rows={3}></textarea>
                     </div>
                     <button type="submit" className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Salvar Alterações</button>
                 </form>
@@ -1191,15 +1192,15 @@ const AddMedicationModal: React.FC<{ patientId: string; onClose: () => void;}> =
                 <form onSubmit={handleSubmit} className="space-y-4">
                      <div>
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Medicamento</label>
-                        <input type="text" value={name} onChange={e => setName(e.target.value)} className="mt-1 block w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-slate-800 dark:text-slate-200" />
+                        <input type="text" value={name} onChange={e => setName(e.target.value)} className="mt-1 block w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-800 dark:text-slate-200" />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Dosagem</label>
-                        <input type="text" value={dosage} onChange={e => setDosage(e.target.value)} className="mt-1 block w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-slate-800 dark:text-slate-200" />
+                        <input type="text" value={dosage} onChange={e => setDosage(e.target.value)} className="mt-1 block w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-800 dark:text-slate-200" />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Data de Início</label>
-                        <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="mt-1 block w-full border border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200" />
+                        <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="mt-1 block w-full border border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200" />
                     </div>
                     <button type="submit" className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Cadastrar</button>
                 </form>
@@ -1303,11 +1304,12 @@ const ChecklistScreen: React.FC = () => {
     const { patientId, categoryId: categoryIdStr } = useParams<{ patientId: string, categoryId: string }>();
     const { patients } = useContext(PatientsContext)!;
     const { getAnswersForChecklist, saveAnswers } = useContext(ChecklistContext)!;
+    const { getQuestionsByCategoryId, loading: questionsLoading } = useContext(QuestionsContext)!;
     
     const patient = patients.find(p => p.id === patientId);
     const categoryId = categoryIdStr ? parseInt(categoryIdStr) : undefined;
     const category = categoryId ? CATEGORIES.find(c => c.id === categoryId) : undefined;
-    const questions = categoryId ? QUESTIONS.filter(q => q.categoryId === categoryId) : [];
+    const questions = categoryId ? getQuestionsByCategoryId(categoryId) : [];
     const navigate = useNavigate();
 
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -1346,6 +1348,10 @@ const ChecklistScreen: React.FC = () => {
         }
     };
 
+    if (questionsLoading) {
+        return <div className="text-center p-8">Carregando perguntas...</div>;
+    }
+
     if (!patient || !category || questions.length === 0) {
         return <p>Paciente, categoria ou perguntas não encontrados.</p>;
     }
@@ -1359,7 +1365,7 @@ const ChecklistScreen: React.FC = () => {
                     Pergunta {currentQuestionIndex + 1}/{questions.length}
                 </div>
                 <h2 className="text-2xl md:text-3xl font-bold text-center mb-6 min-h-[6rem] flex items-center justify-center">
-                    {currentQuestion.text}
+                    {currentQuestion.texto}
                 </h2>
                 <div className="space-y-3">
                     {(['sim', 'não', 'nao_se_aplica'] as Answer[]).map(answer => (
@@ -1713,10 +1719,57 @@ const SettingsScreen: React.FC = () => {
 
 // --- PROVIDERS for Global State ---
 
+const QuestionsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const [questions, setQuestions] = useState<Question[]>([]);
+    const [loading, setLoading] = useState(true);
+    const { showNotification } = useContext(NotificationContext)!;
+
+    const fetchQuestions = async () => {
+        setLoading(true);
+        const { data, error } = await supabase
+            .from('perguntas')
+            .select('id, texto, categoria_id, ordem')
+            .order('ordem', { ascending: true });
+
+        if (error) {
+            console.error("Error fetching questions:", error);
+            showNotification({ message: 'Erro ao carregar perguntas do checklist.', type: 'error' });
+        } else {
+            // Mapeando os campos do Supabase (snake_case) para o tipo Question (camelCase/snake_case misturado)
+            const formattedQuestions: Question[] = (data || []).map(q => ({
+                id: q.id,
+                texto: q.texto,
+                category_id: q.categoria_id,
+                ordem: q.ordem,
+            }));
+            setQuestions(formattedQuestions);
+        }
+        setLoading(false);
+    };
+
+    useEffect(() => {
+        fetchQuestions();
+    }, []);
+
+    const getQuestionsByCategoryId = (categoryId: number): Question[] => {
+        return questions.filter(q => q.category_id === categoryId);
+    };
+
+    const value = {
+        questions,
+        loading,
+        getQuestionsByCategoryId,
+    };
+
+    return <QuestionsContext.Provider value={value}>{children}</QuestionsContext.Provider>;
+};
+
+
 const ChecklistProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [todaysAnswers, setTodaysAnswers] = useState<DbChecklistAnswer[]>([]);
     const [loading, setLoading] = useState(true);
     const { showNotification } = useContext(NotificationContext)!;
+    const { questions, loading: questionsLoading } = useContext(QuestionsContext)!;
 
     const getTodayDateString = () => new Date().toISOString().split('T')[0];
 
@@ -1738,8 +1791,10 @@ const ChecklistProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     };
 
     useEffect(() => {
-        fetchTodaysAnswers();
-    }, []);
+        if (!questionsLoading) {
+            fetchTodaysAnswers();
+        }
+    }, [questionsLoading]);
 
     const getCompletedCategories = (patientId: string): number[] => {
         const patientAnswers = todaysAnswers.filter(a => a.patient_id === patientId);
@@ -1750,8 +1805,8 @@ const ChecklistProvider: React.FC<{ children: React.ReactNode }> = ({ children }
 
         const completed: number[] = [];
         for (const catId in answersByCat) {
-            const questionsForCat = QUESTIONS.filter(q => q.categoryId === Number(catId));
-            if (answersByCat[catId] >= questionsForCat.length) {
+            const questionsForCat = questions.filter(q => q.category_id === Number(catId));
+            if (questionsForCat.length > 0 && answersByCat[catId] >= questionsForCat.length) {
                 completed.push(Number(catId));
             }
         }
@@ -1768,7 +1823,7 @@ const ChecklistProvider: React.FC<{ children: React.ReactNode }> = ({ children }
 
     const saveAnswers = async (patientId: string, categoryId: number, answers: ChecklistAnswer) => {
         const today = getTodayDateString();
-        const questionsForCategory = QUESTIONS.filter(q => q.categoryId === categoryId);
+        const questionsForCategory = questions.filter(q => q.category_id === categoryId);
 
         const upsertData = questionsForCategory
             .filter(q => answers[q.id]) // Only upsert questions that have an answer
@@ -1791,6 +1846,7 @@ const ChecklistProvider: React.FC<{ children: React.ReactNode }> = ({ children }
             showNotification({ message: 'Erro ao salvar checklist.', type: 'error' });
         } else {
             await fetchTodaysAnswers();
+            showNotification({ message: 'Checklist salvo com sucesso!', type: 'success' });
         }
     };
 
@@ -1799,7 +1855,7 @@ const ChecklistProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         saveAnswers,
         getCompletedCategories,
         getAnswersForChecklist,
-        loading,
+        loading: loading || questionsLoading,
     };
 
     return <ChecklistContext.Provider value={value}>{children}</ChecklistContext.Provider>;
@@ -2164,6 +2220,7 @@ const App: React.FC = () => {
                 <UserProvider>
                 <PatientsProvider>
                 <TasksProvider>
+                <QuestionsProvider>
                 <ChecklistProvider>
                     <Routes>
                         {!session ? (
@@ -2186,6 +2243,7 @@ const App: React.FC = () => {
                         )}
                     </Routes>
                 </ChecklistProvider>
+                </QuestionsProvider>
                 </TasksProvider>
                 </PatientsProvider>
                 </UserProvider>
