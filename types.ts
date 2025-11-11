@@ -121,6 +121,7 @@ export interface PatientsContextType {
     deleteMedicationFromPatient: (patientId: string, medicationId: string) => void;
     updateExamInPatient: (patientId: string, examData: Pick<Exam, 'id' | 'result' | 'observation'>) => void;
     deleteExamFromPatient: (patientId: string, examId: string) => void;
+    updatePatientDetails: (patientId: string, details: Pick<Patient, 'motherName' | 'ctd'>) => void;
     loading: boolean;
 }
 

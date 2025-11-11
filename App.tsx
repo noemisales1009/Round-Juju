@@ -779,6 +779,7 @@ const PatientDetailScreen: React.FC = () => {
     const [isAddMedicationModalOpen, setAddMedicationModalOpen] = useState(false);
     const [isRemovalModalOpen, setRemovalModalOpen] = useState<string | null>(null);
     const [isEndDateModalOpen, setEndDateModalOpen] = useState<string | null>(null);
+    const [isEditModalOpen, setEditModalOpen] = useState(false);
 
     const { showNotification } = useContext(NotificationContext)!;
 
@@ -828,11 +829,22 @@ const PatientDetailScreen: React.FC = () => {
     return (
         <div className="space-y-6">
             <div className="bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm">
-                <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-200">{patient.name}</h2>
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-slate-500 dark:text-slate-400 mt-2">
-                    <span>{calculateAge(patient.dob)} anos</span>
-                    <span>Mãe: {patient.motherName}</span>
-                    <span>CTD: {patient.ctd}</span>
+                <div className="flex justify-between items-start gap-4">
+                    <div>
+                        <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-200">{patient.name}</h2>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-slate-500 dark:text-slate-400 mt-2">
+                            <span>{calculateAge(patient.dob)} anos</span>
+                            <span>Mãe: {patient.motherName}</span>
+                            <span>CTD: {patient.ctd}</span>
+                        </div>
+                    </div>
+                    <button 
+                        onClick={() => setEditModalOpen(true)} 
+                        className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition flex-shrink-0"
+                        aria-label="Editar dados do paciente"
+                    >
+                        <PencilIcon className="w-5 h-5" />
+                    </button>
                 </div>
             </div>
 
@@ -964,11 +976,56 @@ const PatientDetailScreen: React.FC = () => {
             {isAddMedicationModalOpen && <AddMedicationModal patientId={patient.id} onClose={() => setAddMedicationModalOpen(false)} />}
             {isRemovalModalOpen && <AddRemovalDateModal deviceId={isRemovalModalOpen} patientId={patient.id} onClose={() => setRemovalModalOpen(null)} />}
             {isEndDateModalOpen && <AddEndDateModal medicationId={isEndDateModalOpen} patientId={patient.id} onClose={() => setEndDateModalOpen(null)} />}
+            {isEditModalOpen && patient && <EditPatientModal patient={patient} onClose={() => setEditModalOpen(false)} />}
         </div>
     );
 };
 
 // Modals
+const EditPatientModal: React.FC<{ patient: Patient; onClose: () => void; }> = ({ patient, onClose }) => {
+    const { updatePatientDetails } = useContext(PatientsContext)!;
+    const [motherName, setMotherName] = useState(patient.motherName);
+    const [ctd, setCtd] = useState(patient.ctd);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        updatePatientDetails(patient.id, { motherName, ctd });
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-30">
+            <div className="bg-white dark:bg-slate-900 p-6 rounded-lg shadow-xl w-full max-w-sm m-4">
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold text-slate-800 dark:text-slate-200">Editar Paciente</h2>
+                    <button onClick={onClose}><CloseIcon className="w-6 h-6 text-slate-500 dark:text-slate-400" /></button>
+                </div>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Nome da Mãe</label>
+                        <input 
+                            type="text" 
+                            value={motherName} 
+                            onChange={e => setMotherName(e.target.value)} 
+                            className="mt-1 block w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-slate-800 dark:text-slate-200" 
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">CTD / Intercorrência</label>
+                        <textarea 
+                            value={ctd} 
+                            onChange={e => setCtd(e.target.value)} 
+                            className="mt-1 block w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-slate-800 dark:text-slate-200"
+                            rows={3}
+                        />
+                    </div>
+                    <button type="submit" className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Salvar Alterações</button>
+                </form>
+            </div>
+        </div>
+    );
+};
+
 const AddDeviceModal: React.FC<{ patientId: string; onClose: () => void;}> = ({ patientId, onClose }) => {
     const { addDeviceToPatient } = useContext(PatientsContext)!;
     const { showNotification } = useContext(NotificationContext)!;
@@ -1864,6 +1921,21 @@ const PatientsProvider: React.FC<{ children: React.ReactNode }> = ({ children })
         else fetchPatients();
     };
 
+    const updatePatientDetails = async (patientId: string, details: Pick<Patient, 'motherName' | 'ctd'>) => {
+        const { error } = await supabase.from('patients').update({ 
+            mother_name: details.motherName,
+            ctd: details.ctd 
+        }).eq('id', patientId);
+
+        if (error) {
+            console.error("Error updating patient details:", error);
+            showNotification({ message: 'Erro ao atualizar paciente.', type: 'error' });
+        } else {
+            showNotification({ message: 'Dados do paciente atualizados!', type: 'success' });
+            fetchPatients();
+        }
+    };
+
 
     const value = {
         patients,
@@ -1876,6 +1948,7 @@ const PatientsProvider: React.FC<{ children: React.ReactNode }> = ({ children })
         deleteMedicationFromPatient,
         updateExamInPatient,
         deleteExamFromPatient,
+        updatePatientDetails,
         loading,
     };
 
