@@ -930,178 +930,817 @@ const AddDeviceModal: React.FC<{ patientId: number; onClose: () => void;}> = ({ 
             return;
         }
         try {
-            console.log('🟢 Modal - Chamando addDeviceToPatient com:',
+            console.log('🟢 Modal - Chamando addDeviceToPatient com:', { patientId, type, location, startDate });
+            await addDeviceToPatient(patientId, { name: type, location, startDate });
+            showNotification({ message: 'Dispositivo cadastrado com sucesso!', type: 'success' });
+            onClose();
+        } catch (error) {
+            console.error('Erro ao cadastrar dispositivo:', error);
+            showNotification({ message: 'Erro ao cadastrar dispositivo.', type: 'error' });
+        }
+    };
 
-Perfeitamente correto! Você precisa criar essas tabelas no Supabase para funcionar com perguntas dinâmicas. Vou te ajudar a:
-
-1. **Criar as tabelas no Supabase** (SQL pronto)
-2. **Criar um hook para buscar perguntas do Supabase**
-3. **Atualizar o código para usar perguntas dinâmicas**
-
----
-
-### 1. SQL para criar as tabelas no Supabase
-
-Copie e cole isso no **SQL Editor** do seu Supabase:
-
-```sql
--- Tabela de categorias
-CREATE TABLE IF NOT EXISTS public.categorias (
-  id SERIAL PRIMARY KEY,
-  nome TEXT NOT NULL UNIQUE,
-  icone TEXT NULL
-);
-
--- Tabela de perguntas
-CREATE TABLE IF NOT EXISTS public.perguntas (
-  id SERIAL PRIMARY KEY,
-  texto TEXT NOT NULL,
-  categoria_id INTEGER REFERENCES categorias(id),
-  ordem INTEGER NOT NULL
-);
-
--- Inserir dados de exemplo (opcional)
-INSERT INTO public.categorias (id, nome, icone) VALUES
-(1, 'Sistema Nutricional', 'apple'),
-(2, 'Hídrico', 'droplet'),
-(3, 'Hemodinâmico', 'heart-pulse'),
-(4, 'Hematológico', 'beaker'),
-(5, 'Hepático', 'liver'),
-(6, 'Respiratório', 'lungs'),
-(7, 'Fisioterapia', 'dumbbell'),
-(8, 'Neurológico', 'brain'),
-(9, 'Farmácia', 'pill'),
-(10, 'Gerenciamento de Risco', 'shield'),
-(11, 'Família', 'users'),
-(12, 'Avaliação de Alta', 'home');
-
-INSERT INTO public.perguntas (texto, categoria_id, ordem) VALUES
--- Sistema Nutricional
-('NUTRIÇÃO ADEQUADA? (INICIAR ORAL/ENTERAL/NPT)', 1, 1),
-('TOLERÂNCIA À ALIMENTAÇÃO (VÔMITOS)?', 1, 2),
-('RELATA DIARRÉIA OU CONSTIPAÇÃO?', 1, 3),
-('GLICEMIA CONTROLADA? (DX 60-150)', 1, 4),
-('NECESSIDADE DE PROFILAXIA PARA ÚLCERA DE ESTRESSE?', 1, 5),
-('NECESSIDADE DE CONTROLE DE RESÍDUO GÁSTRICO?', 1, 6),
-('FIXAÇÃO DE SNGE/SNE OK?', 1, 7),
-('NECESSIDADE DE RX DE ABDOMEN PARA CHECAR SONDA?', 1, 8),
--- Hídrico
-('HÁ SINAIS DE SOBRECARGA HÍDRICA CLÍNICA?', 2, 1),
-('BH POSITIVO >3% NAS ÚLTIMAS 24 HORAS?', 2, 2),
--- Hemodinâmico
-('APARELHO DE PANI ADEQUADO?', 3, 1),
--- Hematológico
-('HEMOGRAMA OK?', 4, 1),
-('HEMOGLOBINA OK?', 4, 2),
-('PLAQUETAS OK?', 4, 3),
-('TEMPO DE COAGULAÇÃO OK?', 4, 4),
-('NECESSIDADE DE TRANSFUSÃO?', 4, 5),
--- Hepático
-('BILIRRUBINAS OK?', 5, 1),
-('TGO/TGP OK?', 5, 2),
-('FOSFATASE ALCALINA OK?', 5, 3),
-('TEMPO DE PROTROMBINA OK?', 5, 4),
--- Respiratório
-('SATURAÇÃO OK?', 6, 1),
-('ESFORÇO RESPIRATÓRIO OK?', 6, 2),
-('VENTILAÇÃO OK?', 6, 3),
-('NECESSIDADE DE SUÇÃO?', 6, 4),
-('OXIGÊNIO OK?', 6, 5),
--- Fisioterapia
-('FISIOTERAPIA REALIZADA?', 7, 1),
-('NECESSIDADE DE FISIOTERAPIA?', 7, 2),
--- Neurológico
-('ESCALA DE COMA OK?', 8, 1),
-('PUPILAS OK?', 8, 2),
-('MENINGISMO OK?', 8, 3),
-('NECESSIDADE DE PROTEÇÃO NEUROLÓGICA?', 8, 4),
--- Farmácia
-('MEDICAMENTOS OK?', 9, 1),
-('INTERAÇÕES MEDICAMENTOSAS OK?', 9, 2),
-('NECESSIDADE DE AJUSTE DE DOSAGEM?', 9, 3),
--- Gerenciamento de Risco
-('QUEDA OK?', 10, 1),
-('ÚLCERA POR PRESSÃO OK?', 10, 2),
-('INFECÇÃO OK?', 10, 3),
--- Família
-('FAMÍLIA PARTICIPATIVA?', 11, 1),
-('ORIENTAÇÃO REALIZADA?', 11, 2),
--- Avaliação de Alta
-('PRONÓSTICO OK?', 12, 1),
-('ALTA PREVISTA?', 12, 2),
-('NECESSIDADE DE ALTA DOMICILIAR?', 12, 3),
-('NECESSIDADE DE ALTA PARA HOSPITAL DE REFERÊNCIA?', 12, 4);
-```
-
----
-
-### 2. Criar hook para buscar perguntas do Supabase
-
-<dyad-write path="src/hooks/useSupabaseQuestions.ts" description="Criando hook para buscar perguntas do Supabase">
-import { useState, useEffect } from 'react';
-import { supabase } from '../integrations/supabase/client';
-import type { Question } from '../../types';
-
-export const useSupabaseQuestions = () => {
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const loadQuestions = async () => {
-    try {
-      setLoading(true);
-      console.log('🔄 Carregando perguntas do Supabase...');
-
-      // Buscar categorias
-      const { data: categoriesData, error: categoriesError } = await supabase
-        .from('categorias')
-        .select('*')
-        .order('id');
-
-      if (categoriesError) {
-        console.error('❌ Erro ao buscar categorias:', categoriesError);
-        throw categoriesError;
-      }
-
-      // Buscar perguntas
-      const { data: questionsData, error: questionsError } = await supabase
-        .from('perguntas')
-        .select('*')
-        .order('ordem');
-
-      if (questionsError) {
-        console.error('❌ Erro ao buscar perguntas:', questionsError);
-        throw questionsError;
-      }
-
-      console.log('✅ Categorias do Supabase:', categoriesData);
-      console.log('✅ Perguntas do Supabase:', questionsData);
-
-      // Mapear perguntas com categoria
-      const mappedQuestions: Question[] = (questionsData || []).map((q, index) => {
-        const category = categoriesData?.find(c => c.id === q.categoria_id);
-        return {
-          id: index + 1,
-          text: q.texto,
-          categoryId: category?.id || 0,
-        };
-      });
-
-      console.log('✅ Perguntas mapeadas:', mappedQuestions);
-      setQuestions(mappedQuestions);
-    } catch (error) {
-      console.error('❌ Erro ao carregar perguntas:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadQuestions();
-  }, []);
-
-  return {
-    questions,
-    loading,
-    loadQuestions,
-  };
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-30">
+            <div className="bg-white dark:bg-slate-900 p-6 rounded-lg shadow-xl w-full max-w-sm m-4">
+                 <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold text-slate-800 dark:text-slate-200">Cadastrar Dispositivo</h2>
+                    <button onClick={onClose}><CloseIcon className="w-6 h-6 text-slate-500 dark:text-slate-400" /></button>
+                </div>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Tipo</label>
+                        <select value={type} onChange={e => setType(e.target.value)} className="mt-1 block w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-slate-800 dark:text-slate-200">
+                            <option value="" disabled>Selecione...</option>
+                            {DEVICE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                    </div>
+                     <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Local</label>
+                         <select value={location} onChange={e => setLocation(e.target.value)} className="mt-1 block w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-slate-800 dark:text-slate-200">
+                            <option value="" disabled>Selecione...</option>
+                            {DEVICE_LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
+                        </select>
+                    </div>
+                     <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Dia da inserção</label>
+                        <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="mt-1 block w-full border border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200" />
+                    </div>
+                    <button type="submit" className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Cadastrar</button>
+                </form>
+            </div>
+        </div>
+    );
 };
+
+const AddExamModal: React.FC<{ patientId: number; onClose: () => void;}> = ({ patientId, onClose }) => {
+    const { addExamToPatient } = useContext(PatientsContext)!;
+    const { showNotification } = useContext(NotificationContext)!;
+    const [name, setName] = useState('');
+    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [result, setResult] = useState<'Pendente' | 'Normal' | 'Alterado'>('Pendente');
+    const [observation, setObservation] = useState('');
+    
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if(!name || !date || !result) {
+            showNotification({ message: 'Preencha todos os campos obrigatórios.', type: 'error' });
+            return;
+        }
+        try {
+            await addExamToPatient(patientId, { name, date, result, observation });
+            showNotification({ message: 'Exame cadastrado com sucesso!', type: 'success' });
+            onClose();
+        } catch (error) {
+            console.error('Erro ao cadastrar exame:', error);
+            showNotification({ message: 'Erro ao cadastrar exame.', type: 'error' });
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-30">
+            <div className="bg-white dark:bg-slate-900 p-6 rounded-lg shadow-xl w-full max-w-sm m-4">
+                 <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold text-slate-800 dark:text-slate-200">Cadastrar Exame</h2>
+                    <button onClick={onClose}><CloseIcon className="w-6 h-6 text-slate-500 dark:text-slate-400" /></button>
+                </div>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                     <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Exame</label>
+                        <input type="text" placeholder="Ex: Hemograma" value={name} onChange={e => setName(e.target.value)} className="mt-1 block w-full border bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-slate-800 dark:text-slate-200" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Data</label>
+                        <input type="date" value={date} onChange={e => setDate(e.target.value)} className="mt-1 block w-full border border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200" />
+                    </div>
+                     <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Status</label>
+                         <select value={result} onChange={e => setResult(e.target.value as any)} className="mt-1 block w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-slate-800 dark:text-slate-200">
+                            {EXAM_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Observação (Opcional)</label>
+                        <textarea value={observation} onChange={e => setObservation(e.target.value)} placeholder="Digite aqui..." className="mt-1 block w-full border bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-slate-800 dark:text-slate-200" rows={3}></textarea>
+                    </div>
+                    <button type="submit" className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Cadastrar</button>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+const EditExamModal: React.FC<{ exam: Exam; patientId: number; onClose: () => void;}> = ({ exam, patientId, onClose }) => {
+    const { updateExamInPatient } = useContext(PatientsContext)!;
+    const { showNotification } = useContext(NotificationContext)!;
+    
+    const [result, setResult] = useState(exam.result);
+    const [observation, setObservation] = useState(exam.observation || '');
+    
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            await updateExamInPatient(patientId, { id: exam.id, result, observation });
+            showNotification({ message: 'Exame atualizado com sucesso!', type: 'success' });
+            onClose();
+        } catch (error) {
+            console.error('Erro ao atualizar exame:', error);
+            showNotification({ message: 'Erro ao atualizar exame.', type: 'error' });
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-30">
+            <div className="bg-white dark:bg-slate-900 p-6 rounded-lg shadow-xl w-full max-w-sm m-4">
+                 <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold text-slate-800 dark:text-slate-200">Editar Exame</h2>
+                    <button onClick={onClose}><CloseIcon className="w-6 h-6 text-slate-500 dark:text-slate-400" /></button>
+                </div>
+                <div className="mb-4 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                    <p className="font-semibold text-slate-700 dark:text-slate-300">{exam.name}</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Data: {new Date(exam.date).toLocaleDateString('pt-BR')}</p>
+                </div>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Status</label>
+                         <select value={result} onChange={e => setResult(e.target.value as any)} className="mt-1 block w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-slate-800 dark:text-slate-200">
+                            {EXAM_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Observação (Opcional)</label>
+                        <textarea value={observation} onChange={e => setObservation(e.target.value)} placeholder="Digite aqui..." className="mt-1 block w-full border bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-slate-800 dark:text-slate-200" rows={3}></textarea>
+                    </div>
+                    <button type="submit" className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Salvar Alterações</button>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+const AddMedicationModal: React.FC<{ patientId: number; onClose: () => void;}> = ({ patientId, onClose }) => {
+    const { addMedicationToPatient } = useContext(PatientsContext)!;
+     const { showNotification } = useContext(NotificationContext)!;
+    const [name, setName] = useState('');
+    const [dosage, setDosage] = useState('');
+    const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+    
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if(!name || !dosage || !startDate) {
+            showNotification({ message: 'Preencha todos os campos.', type: 'error' });
+            return;
+        }
+        try {
+            await addMedicationToPatient(patientId, { name, dosage, startDate });
+            showNotification({ message: 'Medicação cadastrada com sucesso!', type: 'success' });
+            onClose();
+        } catch (error) {
+            console.error('Erro ao cadastrar medicação:', error);
+            showNotification({ message: 'Erro ao cadastrar medicação.', type: 'error' });
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-30">
+            <div className="bg-white dark:bg-slate-900 p-6 rounded-lg shadow-xl w-full max-w-sm m-4">
+                 <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold text-slate-800 dark:text-slate-200">Cadastrar Medicação</h2>
+                    <button onClick={onClose}><CloseIcon className="w-6 h-6 text-slate-500 dark:text-slate-400" /></button>
+                </div>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                     <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Medicamento</label>
+                        <input type="text" value={name} onChange={e => setName(e.target.value)} className="mt-1 block w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-slate-800 dark:text-slate-200" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Dosagem</label>
+                        <input type="text" value={dosage} onChange={e => setDosage(e.target.value)} className="mt-1 block w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-slate-800 dark:text-slate-200" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Data de Início</label>
+                        <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="mt-1 block w-full border border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200" />
+                    </div>
+                    <button type="submit" className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Cadastrar</button>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+const AddRemovalDateModal: React.FC<{ deviceId: number, patientId: number, onClose: () => void }> = ({ deviceId, patientId, onClose }) => {
+    const { addRemovalDateToDevice } = useContext(PatientsContext)!;
+    const { showNotification } = useContext(NotificationContext)!;
+    const [removalDate, setRemovalDate] = useState(new Date().toISOString().split('T')[0]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            await addRemovalDateToDevice(patientId, deviceId, removalDate);
+            showNotification({ message: 'Data de retirada registrada!', type: 'success' });
+            onClose();
+        } catch (error) {
+            console.error('Erro ao registrar data de retirada:', error);
+            showNotification({ message: 'Erro ao registrar data de retirada.', type: 'error' });
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-30">
+            <div className="bg-white dark:bg-slate-900 p-6 rounded-lg shadow-xl w-full max-w-sm m-4">
+                <h2 className="text-xl font-bold mb-4 text-slate-800 dark:text-slate-200">Registrar Data de Retirada</h2>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Data da Retirada</label>
+                        <input type="date" value={removalDate} onChange={e => setRemovalDate(e.target.value)} className="mt-1 block w-full border border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200" />
+                    </div>
+                    <div className="flex gap-2">
+                        <button type="button" onClick={onClose} className="w-full bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 font-bold py-2 px-4 rounded-lg">Cancelar</button>
+                        <button type="submit" className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Salvar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+const AddEndDateModal: React.FC<{ medicationId: number, patientId: number, onClose: () => void }> = ({ medicationId, patientId, onClose }) => {
+    const { addEndDateToMedication } = useContext(PatientsContext)!;
+    const { showNotification } = useContext(NotificationContext)!;
+    const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            await addEndDateToMedication(patientId, medicationId, endDate);
+            showNotification({ message: 'Data de fim registrada!', type: 'success' });
+            onClose();
+        } catch (error) {
+            console.error('Erro ao registrar data de fim:', error);
+            showNotification({ message: 'Erro ao registrar data de fim.', type: 'error' });
+        }
+    };
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-30">
+            <div className="bg-white dark:bg-slate-900 p-6 rounded-lg shadow-xl w-full max-w-sm m-4">
+                <h2 className="text-xl font-bold mb-4 text-slate-800 dark:text-slate-200">Registrar Data de Fim</h2>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Data de Fim</label>
+                        <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="mt-1 block w-full border border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200" />
+                    </div>
+                    <div className="flex gap-2">
+                        <button type="button" onClick={onClose} className="w-full bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 font-bold py-2 px-4 rounded-lg">Cancelar</button>
+                        <button type="submit" className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Salvar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+const RoundCategoryListScreen: React.FC = () => {
+    const { patientId } = useParams<{ patientId: string }>();
+    const { patients } = useContext(PatientsContext)!;
+    const patient = patients.find(p => p.id.toString() === patientId);
+
+    useHeader('Round: Categorias');
+    
+    if (!patientId || !patient) return <p>Paciente não encontrado.</p>;
+
+    const completedCategories = getCompletedCategoriesForPatient(patientId);
+
+    return (
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {CATEGORIES.map(category => {
+                const isCompleted = completedCategories.includes(category.id);
+                return (
+                    <Link
+                        key={category.id}
+                        to={`/patient/${patientId}/round/category/${category.id}`}
+                        className={`p-4 rounded-xl shadow-sm text-center font-semibold transition flex flex-col items-center justify-center gap-2 ${
+                            isCompleted 
+                                ? 'bg-blue-500 text-white hover:bg-blue-600' 
+                                : 'bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800'
+                        }`}
+                    >
+                        {category.icon && <category.icon className={`w-8 h-8 ${isCompleted ? 'text-white' : 'text-blue-600 dark:text-blue-400'}`} />}
+                        <span className={isCompleted ? 'text-white' : 'text-slate-700 dark:text-slate-300'}>{category.name}</span>
+                    </Link>
+                )
+            })}
+        </div>
+    );
+};
+
+const ChecklistScreen: React.FC = () => {
+    const { patientId, categoryId } = useParams<{ patientId: string, categoryId: string }>();
+    const { patients } = useContext(PatientsContext)!;
+    const { questions } = useQuestions(); // Usar perguntas dinâmicas
+    
+    const patient = patients.find(p => p.id.toString() === patientId);
+    const category = CATEGORIES.find(c => c.id.toString() === categoryId);
+    const categoryQuestions = questions.filter(q => q.categoryId.toString() === categoryId);
+    const navigate = useNavigate();
+
+    const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+
+    useHeader(category ? `Checklist: ${category.name}` : 'Checklist');
+
+    const [answers, setAnswers] = useState<ChecklistAnswer>(() => {
+        const savedAnswers = localStorage.getItem(`checklist_${patientId}_${categoryId}`);
+        return savedAnswers ? JSON.parse(savedAnswers) : {};
+    });
+
+    useEffect(() => {
+        localStorage.setItem(`checklist_${patientId}_${categoryId}`, JSON.stringify(answers));
+    }, [answers, patientId, categoryId]);
+
+    const handleAnswer = (questionId: number, answer: Answer) => {
+        setAnswers(prev => ({ ...prev, [questionId]: answer }));
+    };
+    
+    const handleSave = () => {
+        if (!patientId || !categoryId) return;
+        markCategoryAsCompletedForPatient(patientId, parseInt(categoryId));
+        navigate(`/patient/${patientId}/round/categories`);
+    };
+
+    const handleNext = () => {
+        if (currentQuestionIndex < categoryQuestions.length - 1) {
+            setCurrentQuestionIndex(prev => prev + 1);
+        } else {
+            handleSave();
+        }
+    };
+
+    const handlePrevious = () => {
+        if (currentQuestionIndex > 0) {
+            setCurrentQuestionIndex(prev => prev - 1);
+        }
+    };
+
+    if (!patient || !category || categoryQuestions.length === 0) {
+        return <p>Paciente, categoria ou perguntas não encontrados.</p>;
+    }
+
+    const currentQuestion = categoryQuestions[currentQuestionIndex];
+
+    return (
+        <div className="relative pb-24">
+            <div className="bg-blue-500 dark:bg-blue-700 text-white rounded-xl shadow-lg p-6 md:p-8 flex flex-col max-w-lg mx-auto">
+                <div className="bg-black/10 text-xs font-bold px-3 py-1 rounded-full self-start mb-6">
+                    Pergunta {currentQuestionIndex + 1}/{categoryQuestions.length}
+                </div>
+                <h2 className="text-2xl md:text-3xl font-bold text-center mb-6 min-h-[6rem] flex items-center justify-center">
+                    {currentQuestion.text}
+                </h2>
+                <div className="space-y-3">
+                    {(['sim', 'não', 'nao_se_aplica'] as Answer[]).map(answer => (
+                        <button
+                            key={answer}
+                            onClick={() => handleAnswer(currentQuestion.id, answer)}
+                            className={`w-full py-3.5 px-4 rounded-lg font-bold text-lg transition-all transform active:scale-95 ${
+                                answers[currentQuestion.id] === answer
+                                    ? 'bg-white text-blue-600 shadow-md ring-2 ring-white'
+                                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                            }`}
+                        >
+                            {answer.replace('_', ' ').toUpperCase()}
+                        </button>
+                    ))}
+                </div>
+                <div className="flex justify-between items-center mt-8 pt-6 border-t border-white/20">
+                    <button
+                        onClick={handlePrevious}
+                        disabled={currentQuestionIndex === 0}
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        Anterior
+                    </button>
+                    <button
+                        onClick={handleNext}
+                        className="bg-white text-blue-600 font-bold py-2 px-6 rounded-lg shadow-md hover:bg-slate-100 transition"
+                    >
+                        {currentQuestionIndex === categoryQuestions.length - 1 ? 'Salvar' : 'Próximo'}
+                    </button>
+                </div>
+            </div>
+            
+            <button
+                onClick={() => navigate(`/patient/${patientId}/round/category/${categoryId}/create-alert`)}
+                className="fixed bottom-6 right-6 lg:bottom-8 lg:right-8 bg-yellow-400 hover:bg-yellow-500 text-slate-800 w-16 h-16 rounded-full shadow-lg flex items-center justify-center z-20 transition transform active:scale-90"
+                aria-label="Criar Alerta"
+            >
+                <BellIcon className="w-8 h-8"/>
+            </button>
+        </div>
+    );
+};
+
+const CreateAlertScreen: React.FC = () => {
+    const { patientId, categoryId } = useParams<{ patientId: string, categoryId?: string }>();
+    const { patients } = useContext(PatientsContext)!;
+    const { addTask } = useContext(TasksContext)!;
+    const { showNotification } = useContext(NotificationContext)!;
+    const navigate = useNavigate();
+    
+    const patient = patients.find(p => p.id.toString() === patientId);
+    const category = categoryId ? CATEGORIES.find(c => c.id.toString() === categoryId) : null;
+
+    const [description, setDescription] = useState('');
+    const [responsible, setResponsible] = useState('');
+    const [deadline, setDeadline] = useState('');
+
+    useHeader(category ? `Alerta: ${category.name}` : 'Criar Alerta');
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!patientId || !description || !responsible || !deadline) return;
+
+        const deadlineHours = parseInt(deadline.split(' ')[0]);
+        const deadlineDate = new Date(Date.now() + deadlineHours * 60 * 60 * 1000).toISOString();
+
+        addTask({
+            patientId: parseInt(patientId),
+            categoryId: category ? category.id : 0,
+            description,
+            responsible,
+            deadline: deadlineDate,
+        });
+
+        showNotification({ message: 'Alerta criado com sucesso!', type: 'success' });
+        
+        if (categoryId) {
+            navigate(`/patient/${patientId}/round/category/${categoryId}`);
+        } else {
+            navigate(`/patient/${patientId}`);
+        }
+    };
+    
+    if (!patient) {
+        return <p>Paciente não encontrado</p>;
+    }
+
+
+    return (
+        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl overflow-hidden max-w-md mx-auto shadow-lg">
+            <div className="p-6 bg-blue-500 dark:bg-blue-600 text-white text-center">
+                <h2 className="text-xl font-bold">{patient.name}</h2>
+                {category && <p className="text-blue-100">{category.name}</p>}
+            </div>
+            <div className="p-6 bg-white dark:bg-slate-800">
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Alerta</label>
+                        <input
+                          type="text"
+                          value={description}
+                          onChange={e => setDescription(e.target.value)}
+                          placeholder="Digite o alerta identificado..."
+                          required
+                          className="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition text-slate-800 dark:text-slate-200"
+                        />
+                    </div>
+                     <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Responsável</label>
+                        <select value={responsible} onChange={e => setResponsible(e.target.value)} required className="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition text-slate-800 dark:text-slate-200">
+                            <option value="" disabled>Selecione...</option>
+                            {RESPONSIBLES.map(r => <option key={r} value={r}>{r}</option>)}
+                        </select>
+                    </div>
+                     <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Selecione a hora</label>
+                        <select value={deadline} onChange={e => setDeadline(e.target.value)} required className="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition text-slate-800 dark:text-slate-200">
+                            <option value="" disabled>Selecione...</option>
+                            {ALERT_DEADLINES.map(d => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                    </div>
+                    <button
+                      type="submit"
+                      className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg transition text-lg flex items-center justify-center gap-2"
+                    >
+                        <PencilIcon className="w-5 h-5"/>
+                        Criar alerta
+                    </button>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+const TaskStatusScreen: React.FC = () => {
+    const { status } = useParams<{ status: TaskStatus }>();
+    const { tasks, updateTaskJustification, updateTaskStatus } = useContext(TasksContext)!;
+    const { patients } = useContext(PatientsContext)!;
+
+    const [justificationModal, setJustificationModal] = useState<Task | null>(null);
+
+    const filteredTasks = tasks.filter((t: Task) => t.status === status);
+    
+    const statusConfig = {
+        alerta: { title: 'Alertas', icon: WarningIcon, color: 'yellow' },
+        no_prazo: { title: 'No Prazo', icon: ClockIcon, color: 'blue' },
+        fora_do_prazo: { title: 'Fora do Prazo', icon: AlertIcon, color: 'red' },
+        concluido: { title: 'Concluídos', icon: CheckCircleIcon, color: 'green' },
+    };
+
+    const config = statusConfig[status as TaskStatus];
+    useHeader(config ? config.title : 'Tarefas');
+
+    const handleJustify = (task: Task, justification: string) => {
+        updateTaskJustification(task.id, justification);
+        setJustificationModal(null);
+    };
+    
+    const handleCompleteTask = (taskId: number) => {
+        if(window.confirm('Tem certeza que deseja marcar esta tarefa como concluída?')){
+            updateTaskStatus(taskId, 'concluido');
+        }
+    };
+
+    if (!config) return <p>Status inválido.</p>;
+
+    return (
+        <div className="space-y-4">
+            {filteredTasks.map((task: Task) => {
+                const patient = patients.find((p: Patient) => p.id === task.patientId);
+                const category = CATEGORIES.find(c => c.id === task.categoryId);
+                return (
+                    <div key={task.id} className={`bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border-l-4 border-${config.color}-500`}>
+                        <div className="flex justify-between items-start">
+                             <div>
+                                <p className="font-bold text-slate-800 dark:text-slate-200">{task.description}</p>
+                                <p className="text-sm text-slate-500 dark:text-slate-400">
+                                    <Link to={`/patient/${patient?.id}`} className="hover:underline font-semibold">{patient?.name}</Link> - Leito {patient?.bedNumber}
+                                </p>
+                                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Responsável: {task.responsible} | Categoria: {category?.name}</p>
+                                {task.justification && <p className="text-xs italic text-blue-600 dark:text-blue-400 mt-1">Justificativa: {task.justification}</p>}
+                            </div>
+                            <div className="text-right flex-shrink-0 ml-2">
+                                <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">Prazo:</p>
+                                <p className={`text-sm font-bold text-${config.color}-600 dark:text-${config.color}-400`}>
+                                    {new Date(task.deadline).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                            </div>
+                        </div>
+                        {status === 'fora_do_prazo' && (
+                            <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-800 flex gap-2">
+                                <button onClick={() => setJustificationModal(task)} className="text-xs bg-blue-100 dark:bg-blue-900/80 text-blue-700 dark:text-blue-300 font-semibold px-3 py-1.5 rounded-md hover:bg-blue-200 dark:hover:bg-blue-900">Justificar Atraso</button>
+                                <button onClick={() => handleCompleteTask(task.id)} className="text-xs bg-green-100 dark:bg-green-900/80 text-green-700 dark:text-green-300 font-semibold px-3 py-1.5 rounded-md hover:bg-green-200 dark:hover:bg-green-900">Concluir</button>
+                            </div>
+                        )}
+                        {status !== 'concluido' && status !== 'fora_do_prazo' && (
+                             <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-800 flex gap-2">
+                                 <button onClick={() => handleCompleteTask(task.id)} className="text-xs bg-green-100 dark:bg-green-900/80 text-green-700 dark:text-green-300 font-semibold px-3 py-1.5 rounded-md hover:bg-green-200 dark:hover:bg-green-900">Marcar como Concluída</button>
+                             </div>
+                        )}
+                    </div>
+                );
+            })}
+             {justificationModal && <JustificationModal task={justificationModal} onClose={() => setJustificationModal(null)} onSave={handleJustify} />}
+        </div>
+    );
+};
+
+const JustificationModal: React.FC<{ task: Task, onClose: () => void, onSave: (task: Task, justification: string) => void }> = ({ task, onClose, onSave }) => {
+    const [justification, setJustification] = useState(task.justification || '');
+    
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-30">
+            <div className="bg-white dark:bg-slate-900 p-6 rounded-lg shadow-xl w-full max-w-sm m-4">
+                <h2 className="text-xl font-bold mb-2 text-slate-800 dark:text-slate-200">Justificar Atraso</h2>
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">{task.description}</p>
+                <textarea
+                    value={justification}
+                    onChange={(e) => setJustification(e.target.value)}
+                    className="w-full border bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 rounded-md shadow-sm p-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-slate-800 dark:text-slate-200"
+                    rows={4}
+                    placeholder="Digite a justificativa..."
+                />
+                <div className="flex gap-2 mt-4">
+                    <button onClick={onClose} className="w-full bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 font-bold py-2 px-4 rounded-lg">Cancelar</button>
+                    <button onClick={() => onSave(task, justification)} className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Salvar</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const SettingsScreen: React.FC = () => {
+    useHeader('Ajustes');
+    const { user, updateUser } = useContext(UserContext)!;
+    const { theme, toggleTheme } = useContext(ThemeContext)!;
+    const { showNotification } = useContext(NotificationContext)!;
+
+    const [name, setName] = useState(user.name);
+    const [title, setTitle] = useState(user.title);
+    const [avatarPreview, setAvatarPreview] = useState(user.avatarUrl);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleSave = () => {
+        updateUser({ name, title, avatarUrl: avatarPreview });
+        showNotification({ message: 'Perfil salvo com sucesso!', type: 'success' });
+    };
+
+    const handleAvatarClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setAvatarPreview(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    return (
+        <div className="space-y-8 max-w-lg mx-auto">
+            <div className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm">
+                <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-200 mb-6">Perfil</h2>
+                <div className="space-y-6">
+                    <div className="flex justify-center">
+                        <div className="relative group">
+                            <img src={avatarPreview} alt="User avatar" className="w-24 h-24 rounded-full object-cover"/>
+                            <button
+                                onClick={handleAvatarClick}
+                                className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 flex items-center justify-center rounded-full transition-all duration-300 opacity-0 group-hover:opacity-100"
+                                aria-label="Mudar foto de perfil"
+                            >
+                                <CameraIcon className="w-8 h-8 text-white" />
+                            </button>
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                onChange={handleFileChange}
+                                accept="image/*"
+                                style={{ display: 'none' }}
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Nome</label>
+                        <input
+                            type="text"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            className="mt-1 w-full px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition text-slate-800 dark:text-slate-200"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Cargo</label>
+                        <input
+                            type="text"
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            className="mt-1 w-full px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition text-slate-800 dark:text-slate-200"
+                        />
+                    </div>
+                    <button onClick={handleSave} className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2.5 px-4 rounded-lg transition">
+                        Salvar Perfil
+                    </button>
+                </div>
+            </div>
+            <div className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm">
+                <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-200 mb-4">Aparência</h2>
+                <div className="flex justify-between items-center">
+                    <span className="font-medium text-slate-700 dark:text-slate-300">Modo Escuro</span>
+                    <button
+                        onClick={toggleTheme}
+                        className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors ${
+                            theme === 'dark' ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-700'
+                        }`}
+                    >
+                        <span
+                            className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform ${
+                                theme === 'dark' ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                        />
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- PROVIDERS for Global State ---
+
+const PatientsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const supabaseHook = useSupabasePatients();
+    
+    console.log('🔵 PatientsProvider - supabaseHook:', supabaseHook);
+
+    return <PatientsContext.Provider value={supabaseHook as PatientsContextType}>{children}</PatientsContext.Provider>;
+};
+
+
+const TasksProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const supabaseHook = useSupabaseTasks();
+    
+    console.log('🔵 TasksProvider - supabaseHook:', supabaseHook);
+
+    return <TasksContext.Provider value={supabaseHook as TasksContextType}>{children}</TasksContext.Provider>;
+};
+
+const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const [notification, setNotification] = useState<NotificationState | null>(null);
+
+    const showNotification = (notification: NotificationState) => {
+        setNotification(notification);
+    };
+
+    const hideNotification = () => {
+        setNotification(null);
+    };
+
+    return (
+        <NotificationContext.Provider value={{ notification, showNotification, hideNotification }}>
+            {children}
+        </NotificationContext.Provider>
+    );
+};
+
+const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const [user, setUser] = useState<User>(INITIAL_USER);
+
+    const updateUser = (userData: Partial<User>) => {
+        setUser(prev => ({ ...prev, ...userData }));
+    };
+
+    return (
+        <UserContext.Provider value={{ user, updateUser }}>
+            {children}
+        </UserContext.Provider>
+    );
+};
+
+const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const [theme, setTheme] = useState<Theme>(() => {
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          return 'dark';
+        }
+        return 'light';
+    });
+
+    useEffect(() => {
+        const root = window.document.documentElement;
+        if (theme === 'dark') {
+            root.classList.add('dark');
+        } else {
+            root.classList.remove('dark');
+        }
+        localStorage.setItem('theme', theme);
+    }, [theme]);
+
+    const toggleTheme = () => {
+        setTheme(prev => prev === 'light' ? 'dark' : 'light');
+    };
+
+    return (
+        <ThemeContext.Provider value={{ theme, toggleTheme }}>
+            {children}
+        </ThemeContext.Provider>
+    );
+};
+
+
+// --- MAIN APP ---
+
+const App: React.FC = () => {
+    return (
+        <HashRouter>
+            <NotificationProvider>
+                <ThemeProvider>
+                <UserProvider>
+                <PatientsProvider>
+                <TasksProvider>
+                <QuestionsProvider>
+                    <Routes>
+                        <Route path="/" element={<LoginScreen />} />
+                        <Route path="/" element={<AppLayout />}>
+                            <Route path="dashboard" element={<DashboardScreen />} />
+                            <Route path="patients" element={<PatientListScreen />} />
+                            <Route path="patient/:patientId" element={<PatientDetailScreen />} />
+                            <Route path="patient/:patientId/history" element={<PatientHistoryScreen />} />
+                            <Route path="patient/:patientId/round/categories" element={<RoundCategoryListScreen />} />
+                            <Route path="patient/:patientId/round/category/:categoryId" element={<ChecklistScreen />} />
+                            <Route path="patient/:patientId/round/category/:categoryId/create-alert" element={<CreateAlertScreen />} />
+                            <Route path="patient/:patientId/create-alert" element={<CreateAlertScreen />} />
+                            <Route path="status/:status" element={<TaskStatusScreen />} />
+                            <Route path="settings" element={<SettingsScreen />} />
+                        </Route>
+                    </Routes>
+                </QuestionsProvider>
+                </TasksProvider>
+                </PatientsProvider>
+                </UserProvider>
+                </ThemeProvider>
+            </NotificationProvider>
+        </HashRouter>
+    );
+}
+
+export default App;
