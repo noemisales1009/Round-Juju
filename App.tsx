@@ -11,7 +11,7 @@ const TasksContext = createContext<TasksContextType | null>(null);
 const PatientsContext = createContext<PatientsContextType | null>(null);
 const NotificationContext = createContext<NotificationContextType | null>(null);
 const UserContext = createContext<UserContextType | null>(null);
-const ThemeContext = createContext<ThemeContextType | null>(null);
+const ThemeContext = createContext<ThemeContextType | null>(null>;
 
 
 // --- LOCAL STORAGE HELPERS for checklist completion ---
@@ -776,7 +776,7 @@ const PatientHistoryScreen: React.FC = () => {
 
 const PatientDetailScreen: React.FC = () => {
     const { patientId } = useParams<{ patientId: string }>();
-    const { patients, deleteDeviceFromPatient, deleteExamFromPatient } = useContext(PatientsContext)!;
+    const { patients, deleteDeviceFromPatient, deleteExamFromPatient, deleteMedicationFromPatient } = useContext(PatientsContext)!;
     const patient = patients.find(p => p.id === patientId);
     
     useHeader(patient ? `Leito ${patient.bedNumber}` : 'Paciente não encontrado');
@@ -803,6 +803,11 @@ const PatientDetailScreen: React.FC = () => {
     const handleDeleteExam = (patientId: string, examId: string) => {
         deleteExamFromPatient(patientId, examId);
         showNotification({ message: 'Exame arquivado com sucesso.', type: 'info' });
+    };
+
+    const handleDeleteMedication = (patientId: string, medicationId: string) => {
+        deleteMedicationFromPatient(patientId, medicationId);
+        showNotification({ message: 'Medicação arquivada com sucesso.', type: 'info' });
     };
 
     const calculateAge = (dob: string) => {
@@ -937,7 +942,15 @@ const PatientDetailScreen: React.FC = () => {
                                                 {medication.endDate && <p className="text-sm text-slate-500 dark:text-slate-400">Fim: {new Date(medication.endDate).toLocaleDateString('pt-BR')}</p>}
                                             </div>
                                         </div>
-                                        {!medication.endDate && <button onClick={() => setEndDateModalOpen(medication.id)} className="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline flex-shrink-0 ml-2">Registrar Fim</button>}
+                                        <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                                            {!medication.endDate ? (
+                                                <button onClick={() => setEndDateModalOpen(medication.id)} className="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline">Registrar Fim</button>
+                                            ) : (
+                                                <button onClick={() => handleDeleteMedication(patient.id, medication.id)} className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900 rounded-full transition" aria-label="Arquivar medicação">
+                                                    <CloseIcon className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             ))}
@@ -1713,6 +1726,12 @@ const PatientsProvider: React.FC<{ children: React.ReactNode }> = ({ children })
         else fetchPatients();
     };
     
+    const deleteMedicationFromPatient = async (patientId: string, medicationId: string) => {
+        const { error } = await supabase.from('medications').update({ is_archived: true }).eq('id', medicationId);
+        if (error) console.error("Error archiving medication:", error);
+        else fetchPatients();
+    };
+    
     const updateExamInPatient = async (patientId: string, examData: Pick<Exam, 'id' | 'result' | 'observation'>) => {
         const { error } = await supabase.from('exams').update({ result: examData.result, observation: examData.observation }).eq('id', examData.id);
         if (error) console.error("Error updating exam:", error);
@@ -1734,6 +1753,7 @@ const PatientsProvider: React.FC<{ children: React.ReactNode }> = ({ children })
         addRemovalDateToDevice,
         deleteDeviceFromPatient,
         addEndDateToMedication,
+        deleteMedicationFromPatient,
         updateExamInPatient,
         deleteExamFromPatient,
         loading,
