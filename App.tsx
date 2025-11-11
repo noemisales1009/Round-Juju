@@ -374,39 +374,75 @@ const AuthScreen: React.FC = () => {
 const DashboardScreen: React.FC = () => {
     useHeader('Dashboard');
     const navigate = useNavigate();
-    const { tasks, loading } = useContext(TasksContext)!;
 
-    const summaryData = useMemo(() => {
-        const counts = tasks.reduce((acc, task) => {
-            acc[task.status] = (acc[task.status] || 0) + 1;
-            return acc;
-        }, {} as Record<TaskStatus, number>);
+    const [summary, setSummary] = useState<any>(null);
+    const [alertChartData, setAlertChartData] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true);
+
+            // Fetch summary counts
+            const { data: summaryData, error: summaryError } = await supabase
+                .from('dashboard_summary')
+                .select('*')
+                .single();
+
+            if (summaryError) {
+                console.error('Error fetching dashboard summary:', summaryError);
+            }
+
+            // Fetch active alerts for the chart
+            const { data: activeAlerts, error: alertsError } = await supabase
+                .from('tasks_status_view')
+                .select('category_id')
+                .eq('original_status', 'alerta')
+                .neq('live_status', 'concluido');
+
+            if (alertsError) {
+                console.error('Error fetching active alerts:', alertsError);
+            }
+
+            // Process summary data
+            setSummary(summaryData || { total_alertas: 0, total_no_prazo: 0, total_fora_do_prazo: 0, total_concluidos: 0 });
+
+            // Process chart data
+            if (activeAlerts) {
+                const counts = activeAlerts.reduce((acc, task) => {
+                    acc[task.category_id] = (acc[task.category_id] || 0) + 1;
+                    return acc;
+                }, {} as Record<string, number>);
+
+                const sorted = (Object.entries(counts) as [string, number][]).sort(([, countA], [, countB]) => countB - countA);
+                const maxCount = Math.max(...sorted.map(([, count]) => count), 0);
+                
+                const chartData = sorted.map(([categoryId, count]) => {
+                    const category = CATEGORIES.find(c => c.id === Number(categoryId));
+                    return {
+                        name: category?.name || 'Desconhecido',
+                        count,
+                        percentage: maxCount > 0 ? (count / maxCount) * 100 : 0,
+                    };
+                });
+                setAlertChartData(chartData);
+            }
+
+            setLoading(false);
+        };
+
+        fetchData();
+    }, []);
+
+    const summaryCards = useMemo(() => {
+        if (!summary) return [];
         return [
-            { title: 'Alertas', count: counts.alerta || 0, icon: WarningIcon, color: 'text-yellow-500', bgColor: 'bg-yellow-100 dark:bg-yellow-900/50', status: 'alerta' },
-            { title: 'No Prazo', count: counts.no_prazo || 0, icon: ClockIcon, color: 'text-blue-500', bgColor: 'bg-blue-100 dark:bg-blue-900/50', status: 'no_prazo' },
-            { title: 'Fora do Prazo', count: counts.fora_do_prazo || 0, icon: AlertIcon, color: 'text-red-500', bgColor: 'bg-red-100 dark:bg-red-900/50', status: 'fora_do_prazo' },
-            { title: 'Concluídos', count: counts.concluido || 0, icon: CheckCircleIcon, color: 'text-green-500', bgColor: 'bg-green-100 dark:bg-green-900/50', status: 'concluido' },
+            { title: 'Alertas', count: summary.total_alertas || 0, icon: WarningIcon, color: 'text-yellow-500', bgColor: 'bg-yellow-100 dark:bg-yellow-900/50', status: 'alerta' },
+            { title: 'No Prazo', count: summary.total_no_prazo || 0, icon: ClockIcon, color: 'text-blue-500', bgColor: 'bg-blue-100 dark:bg-blue-900/50', status: 'no_prazo' },
+            { title: 'Fora do Prazo', count: summary.total_fora_do_prazo || 0, icon: AlertIcon, color: 'text-red-500', bgColor: 'bg-red-100 dark:bg-red-900/50', status: 'fora_do_prazo' },
+            { title: 'Concluídos', count: summary.total_concluidos || 0, icon: CheckCircleIcon, color: 'text-green-500', bgColor: 'bg-green-100 dark:bg-green-900/50', status: 'concluido' },
         ];
-    }, [tasks]);
-
-    const alertChartData = useMemo(() => {
-        const counts = tasks.filter(t => t.status === 'alerta').reduce((acc, task) => {
-            acc[task.categoryId] = (acc[task.categoryId] || 0) + 1;
-            return acc;
-        }, {} as Record<string, number>);
-
-        const sorted = (Object.entries(counts) as [string, number][]).sort(([, countA], [, countB]) => countB - countA);
-        const maxCount = Math.max(...sorted.map(([, count]) => count), 0);
-        
-        return sorted.map(([categoryId, count]) => {
-            const category = CATEGORIES.find(c => c.id === Number(categoryId));
-            return {
-                name: category?.name || 'Desconhecido',
-                count,
-                percentage: maxCount > 0 ? (count / maxCount) * 100 : 0,
-            };
-        });
-    }, [tasks]);
+    }, [summary]);
 
     if (loading) {
         return <div className="text-center p-8">Carregando dashboard...</div>;
@@ -417,7 +453,7 @@ const DashboardScreen: React.FC = () => {
             <div>
                 <h2 className="text-xl font-semibold text-slate-700 dark:text-slate-300 mb-4">Resumo do Dia</h2>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {summaryData.map(item => (
+                    {summaryCards.map(item => (
                         <div key={item.title} onClick={() => navigate(`/status/${item.status}`)} className="bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm hover:shadow-md transition cursor-pointer flex flex-col items-center justify-center space-y-2">
                             <div className={`p-3 rounded-full ${item.bgColor}`}>
                                 <item.icon className={`w-8 h-8 ${item.color}`} />
