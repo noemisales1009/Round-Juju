@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useContext, useEffect, createContext, useRef } from 'react';
 import { HashRouter, Routes, Route, useNavigate, Link, useParams, useLocation, Outlet, NavLink, Navigate } from 'react-router-dom';
-import { Patient, Category, Question, ChecklistAnswer, Answer, Device, Exam, Medication, Task, TaskStatus, PatientsContextType, TasksContextType, NotificationState, NotificationContextType, User, UserContextType, Theme, ThemeContextType } from './types';
+import { Patient, Category, Question, ChecklistAnswer, Answer, Device, Exam, Medication, Task, TaskStatus, PatientsContextType, TasksContextType, NotificationState, NotificationContextType, User, UserContextType, Theme, ThemeContextType, DbChecklistAnswer, ChecklistContextType } from './types';
 import { CATEGORIES, QUESTIONS, DEVICE_TYPES, DEVICE_LOCATIONS, EXAM_STATUSES, RESPONSIBLES, ALERT_DEADLINES, INITIAL_USER } from './constants';
 import { BackArrowIcon, PlusIcon, WarningIcon, ClockIcon, AlertIcon, CheckCircleIcon, BedIcon, UserIcon, PencilIcon, BellIcon, InfoIcon, EyeOffIcon, ClipboardIcon, FileTextIcon, LogOutIcon, ChevronRightIcon, MenuIcon, DashboardIcon, CpuIcon, PillIcon, BarChartIcon, AppleIcon, DropletIcon, HeartPulseIcon, BeakerIcon, LiverIcon, LungsIcon, DumbbellIcon, BrainIcon, ShieldIcon, UsersIcon, HomeIcon, CloseIcon, SettingsIcon, CameraIcon } from './components/icons';
 import { supabase } from './src/integrations/supabase/client';
@@ -12,53 +12,7 @@ const PatientsContext = createContext<PatientsContextType | null>(null);
 const NotificationContext = createContext<NotificationContextType | null>(null);
 const UserContext = createContext<UserContextType | null>(null);
 const ThemeContext = createContext<ThemeContextType | null>(null);
-
-
-// --- LOCAL STORAGE HELPERS for checklist completion ---
-
-const getTodayDateString = () => new Date().toISOString().split('T')[0];
-
-const getCompletedChecklists = (): Record<string, Record<string, number[]>> => {
-  try {
-    const data = localStorage.getItem('completedChecklists');
-    return data ? JSON.parse(data) : {};
-  } catch (error) {
-    console.error("Failed to parse completed checklists from localStorage", error);
-    return {};
-  }
-};
-
-const saveCompletedChecklists = (data: Record<string, Record<string, number[]>>) => {
-  try {
-    localStorage.setItem('completedChecklists', JSON.stringify(data));
-  } catch (error) {
-    console.error("Failed to save completed checklists to localStorage", error);
-  }
-};
-
-const getCompletedCategoriesForPatient = (patientId: string): number[] => {
-  const today = getTodayDateString();
-  const allCompleted = getCompletedChecklists();
-  return allCompleted[patientId]?.[today] || [];
-};
-
-const markCategoryAsCompletedForPatient = (patientId: string, categoryId: number) => {
-  const today = getTodayDateString();
-  const allCompleted = getCompletedChecklists();
-  
-  if (!allCompleted[patientId]) {
-    allCompleted[patientId] = {};
-  }
-  if (!allCompleted[patientId][today]) {
-    allCompleted[patientId][today] = [];
-  }
-
-  if (!allCompleted[patientId][today].includes(categoryId)) {
-    allCompleted[patientId][today].push(categoryId);
-  }
-
-  saveCompletedChecklists(allCompleted);
-};
+const ChecklistContext = createContext<ChecklistContextType | null>(null);
 
 
 // --- LAYOUT & NAVIGATION ---
@@ -493,6 +447,7 @@ const DashboardScreen: React.FC = () => {
 const PatientListScreen: React.FC = () => {
     useHeader('Leitos');
     const { patients, loading } = useContext(PatientsContext)!;
+    const { getCompletedCategories, loading: checklistLoading } = useContext(ChecklistContext)!;
     const [searchTerm, setSearchTerm] = useState('');
 
     const filteredPatients = useMemo(() => {
@@ -503,11 +458,11 @@ const PatientListScreen: React.FC = () => {
     }, [patients, searchTerm]);
     
     const calculateProgress = (patientId: string) => {
-        const completed = getCompletedCategoriesForPatient(patientId);
+        const completed = getCompletedCategories(patientId);
         return (completed.length / CATEGORIES.length) * 100;
     };
 
-    if (loading) {
+    if (loading || checklistLoading) {
         return <div className="text-center p-8">Carregando pacientes...</div>;
     }
 
@@ -1255,13 +1210,14 @@ const AddEndDateModal: React.FC<{ medicationId: string, patientId: string, onClo
 const RoundCategoryListScreen: React.FC = () => {
     const { patientId } = useParams<{ patientId: string }>();
     const { patients } = useContext(PatientsContext)!;
+    const { getCompletedCategories } = useContext(ChecklistContext)!;
     const patient = patients.find(p => p.id === patientId);
 
     useHeader('Round: Categorias');
     
     if (!patientId || !patient) return <p>Paciente não encontrado.</p>;
 
-    const completedCategories = getCompletedCategoriesForPatient(patientId);
+    const completedCategories = getCompletedCategories(patientId);
 
     return (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -1287,34 +1243,35 @@ const RoundCategoryListScreen: React.FC = () => {
 };
 
 const ChecklistScreen: React.FC = () => {
-    const { patientId, categoryId } = useParams<{ patientId: string, categoryId: string }>();
+    const { patientId, categoryId: categoryIdStr } = useParams<{ patientId: string, categoryId: string }>();
     const { patients } = useContext(PatientsContext)!;
+    const { getAnswersForChecklist, saveAnswers } = useContext(ChecklistContext)!;
     
     const patient = patients.find(p => p.id === patientId);
-    const category = CATEGORIES.find(c => c.id.toString() === categoryId);
-    const questions = QUESTIONS.filter(q => q.categoryId.toString() === categoryId);
+    const categoryId = categoryIdStr ? parseInt(categoryIdStr) : undefined;
+    const category = categoryId ? CATEGORIES.find(c => c.id === categoryId) : undefined;
+    const questions = categoryId ? QUESTIONS.filter(q => q.categoryId === categoryId) : [];
     const navigate = useNavigate();
 
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
 
     useHeader(category ? `Checklist: ${category.name}` : 'Checklist');
 
-    const [answers, setAnswers] = useState<ChecklistAnswer>(() => {
-        const savedAnswers = localStorage.getItem(`checklist_${patientId}_${categoryId}`);
-        return savedAnswers ? JSON.parse(savedAnswers) : {};
-    });
+    const [answers, setAnswers] = useState<ChecklistAnswer>({});
 
     useEffect(() => {
-        localStorage.setItem(`checklist_${patientId}_${categoryId}`, JSON.stringify(answers));
-    }, [answers, patientId, categoryId]);
+        if (patientId && categoryId) {
+            setAnswers(getAnswersForChecklist(patientId, categoryId));
+        }
+    }, [patientId, categoryId, getAnswersForChecklist]);
 
     const handleAnswer = (questionId: number, answer: Answer) => {
         setAnswers(prev => ({ ...prev, [questionId]: answer }));
     };
     
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!patientId || !categoryId) return;
-        markCategoryAsCompletedForPatient(patientId, parseInt(categoryId));
+        await saveAnswers(patientId, categoryId, answers);
         navigate(`/patient/${patientId}/round/categories`);
     };
 
@@ -1697,6 +1654,98 @@ const SettingsScreen: React.FC = () => {
 
 // --- PROVIDERS for Global State ---
 
+const ChecklistProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const [todaysAnswers, setTodaysAnswers] = useState<DbChecklistAnswer[]>([]);
+    const [loading, setLoading] = useState(true);
+    const { showNotification } = useContext(NotificationContext)!;
+
+    const getTodayDateString = () => new Date().toISOString().split('T')[0];
+
+    const fetchTodaysAnswers = async () => {
+        setLoading(true);
+        const today = getTodayDateString();
+        const { data, error } = await supabase
+            .from('checklist_answers')
+            .select('*')
+            .eq('date', today);
+
+        if (error) {
+            console.error("Error fetching today's checklist answers:", error);
+            showNotification({ message: 'Erro ao carregar checklists.', type: 'error' });
+        } else {
+            setTodaysAnswers(data || []);
+        }
+        setLoading(false);
+    };
+
+    useEffect(() => {
+        fetchTodaysAnswers();
+    }, []);
+
+    const getCompletedCategories = (patientId: string): number[] => {
+        const patientAnswers = todaysAnswers.filter(a => a.patient_id === patientId);
+        const answersByCat = patientAnswers.reduce((acc, answer) => {
+            acc[answer.category_id] = (acc[answer.category_id] || 0) + 1;
+            return acc;
+        }, {} as Record<number, number>);
+
+        const completed: number[] = [];
+        for (const catId in answersByCat) {
+            const questionsForCat = QUESTIONS.filter(q => q.categoryId === Number(catId));
+            if (answersByCat[catId] >= questionsForCat.length) {
+                completed.push(Number(catId));
+            }
+        }
+        return completed;
+    };
+
+    const getAnswersForChecklist = (patientId: string, categoryId: number): ChecklistAnswer => {
+        const checklistAnswers = todaysAnswers.filter(a => a.patient_id === patientId && a.category_id === categoryId);
+        return checklistAnswers.reduce((acc, answer) => {
+            acc[answer.question_id] = answer.answer;
+            return acc;
+        }, {} as ChecklistAnswer);
+    };
+
+    const saveAnswers = async (patientId: string, categoryId: number, answers: ChecklistAnswer) => {
+        const today = getTodayDateString();
+        const questionsForCategory = QUESTIONS.filter(q => q.categoryId === categoryId);
+
+        const upsertData = questionsForCategory
+            .filter(q => answers[q.id]) // Only upsert questions that have an answer
+            .map(q => ({
+                patient_id: patientId,
+                category_id: categoryId,
+                question_id: q.id,
+                date: today,
+                answer: answers[q.id],
+            }));
+
+        if (upsertData.length === 0) return;
+
+        const { error } = await supabase.from('checklist_answers').upsert(upsertData, {
+            onConflict: 'patient_id,category_id,question_id,date',
+        });
+
+        if (error) {
+            console.error("Error saving checklist answers:", error);
+            showNotification({ message: 'Erro ao salvar checklist.', type: 'error' });
+        } else {
+            await fetchTodaysAnswers();
+        }
+    };
+
+    const value = {
+        todaysAnswers,
+        saveAnswers,
+        getCompletedCategories,
+        getAnswersForChecklist,
+        loading,
+    };
+
+    return <ChecklistContext.Provider value={value}>{children}</ChecklistContext.Provider>;
+};
+
 const PatientsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [patients, setPatients] = useState<Patient[]>([]);
     const [loading, setLoading] = useState(true);
@@ -1999,6 +2048,7 @@ const App: React.FC = () => {
                 <UserProvider>
                 <PatientsProvider>
                 <TasksProvider>
+                <ChecklistProvider>
                     <Routes>
                         {!session ? (
                             <Route path="*" element={<AuthScreen />} />
@@ -2019,6 +2069,7 @@ const App: React.FC = () => {
                             </Route>
                         )}
                     </Routes>
+                </ChecklistProvider>
                 </TasksProvider>
                 </PatientsProvider>
                 </UserProvider>

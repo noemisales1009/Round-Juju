@@ -60,6 +60,15 @@ export interface ChecklistAnswer {
   [questionId: number]: Answer;
 }
 
+export interface DbChecklistAnswer {
+  id?: string;
+  patient_id: string;
+  category_id: number;
+  question_id: number;
+  answer: Answer;
+  date: string; // "YYYY-MM-DD"
+}
+
 export interface Alert {
   id: number;
   text: string;
@@ -113,6 +122,14 @@ export interface PatientsContextType {
     updateExamInPatient: (patientId: string, examData: Pick<Exam, 'id' | 'result' | 'observation'>) => void;
     deleteExamFromPatient: (patientId: string, examId: string) => void;
     loading: boolean;
+}
+
+export interface ChecklistContextType {
+  todaysAnswers: DbChecklistAnswer[];
+  saveAnswers: (patientId: string, categoryId: number, answers: ChecklistAnswer) => Promise<void>;
+  getCompletedCategories: (patientId: string) => number[];
+  getAnswersForChecklist: (patientId: string, categoryId: number) => ChecklistAnswer;
+  loading: boolean;
 }
 
 // --- NOTIFICATION TYPES ---
