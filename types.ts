@@ -27,6 +27,7 @@ export interface Medication {
   dosage: string;
   startDate: string; // "YYYY-MM-DD"
   endDate?: string; // "YYYY-MM-DD"
+  isArchived?: boolean;
 }
 
 export interface Patient {
@@ -107,6 +108,7 @@ export interface PatientsContextType {
     addRemovalDateToDevice: (patientId: string, deviceId: string, removalDate: string) => void;
     deleteDeviceFromPatient: (patientId: string, deviceId: string) => void;
     addEndDateToMedication: (patientId: string, medicationId: string, endDate: string) => void;
+    deleteMedicationFromPatient: (patientId: string, medicationId: string) => void;
     updateExamInPatient: (patientId: string, examData: Pick<Exam, 'id' | 'result' | 'observation'>) => void;
     deleteExamFromPatient: (patientId: string, examId: string) => void;
     loading: boolean;

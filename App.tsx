@@ -11,7 +11,7 @@ const TasksContext = createContext<TasksContextType | null>(null);
 const PatientsContext = createContext<PatientsContextType | null>(null);
 const NotificationContext = createContext<NotificationContextType | null>(null);
 const UserContext = createContext<UserContextType | null>(null);
-const ThemeContext = createContext<ThemeContextType | null>(null>;
+const ThemeContext = createContext<ThemeContextType | null>(null);
 
 
 // --- LOCAL STORAGE HELPERS for checklist completion ---
@@ -931,7 +931,7 @@ const PatientDetailScreen: React.FC = () => {
                     )}
                      {activeTab === 'medications' && (
                         <>
-                            {patient.medications.map(medication => (
+                            {patient.medications.filter(medication => !medication.isArchived).map(medication => (
                                 <div key={medication.id} className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg">
                                     <div className="flex justify-between items-start">
                                         <div className="flex items-start gap-3">
@@ -1679,7 +1679,7 @@ const PatientsProvider: React.FC<{ children: React.ReactNode }> = ({ children })
             motherName: p.mother_name,
             devices: devicesData?.filter(d => d.patient_id === p.id).map(d => ({...d, startDate: d.start_date, removalDate: d.removal_date, isArchived: d.is_archived})) || [],
             exams: examsData?.filter(e => e.patient_id === p.id).map(e => ({...e, isArchived: e.is_archived})) || [],
-            medications: medicationsData?.filter(m => m.patient_id === p.id).map(m => ({...m, startDate: m.start_date, endDate: m.end_date})) || [],
+            medications: medicationsData?.filter(m => m.patient_id === p.id).map(m => ({...m, startDate: m.start_date, endDate: m.end_date, isArchived: m.is_archived})) || [],
         }));
 
         setPatients(combinedData);
