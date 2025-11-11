@@ -683,7 +683,7 @@ const PatientHistoryScreen: React.FC = () => {
                     <tr><th>Leito</th><td>${patient.bedNumber}</td></tr>
                     <tr><th>Nascimento</th><td>${formatDate(patient.dob)}</td></tr>
                     <tr><th>Nome da Mãe</th><td>${patient.motherName}</td></tr>
-                    <tr><th>CTD</th><td>${patient.ctd}</td></tr>
+                    <tr><th>Intercorrência</th><td>${patient.ctd}</td></tr>
                 </table>
 
                 <h2>Dispositivos</h2>
@@ -835,7 +835,7 @@ const PatientDetailScreen: React.FC = () => {
                         <div className="flex flex-wrap gap-x-4 gap-y-1 text-slate-500 dark:text-slate-400 mt-2">
                             <span>{calculateAge(patient.dob)} anos</span>
                             <span>Mãe: {patient.motherName}</span>
-                            <span>CTD: {patient.ctd}</span>
+                            <span>Intercorrência: {patient.ctd}</span>
                         </div>
                     </div>
                     <button 
@@ -1011,7 +1011,7 @@ const EditPatientModal: React.FC<{ patient: Patient; onClose: () => void; }> = (
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">CTD / Intercorrência</label>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Intercorrência</label>
                         <textarea 
                             value={ctd} 
                             onChange={e => setCtd(e.target.value)} 
