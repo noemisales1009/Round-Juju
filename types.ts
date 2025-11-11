@@ -1,7 +1,8 @@
 import React from 'react';
 
 export interface Device {
-  id: number;
+  id: string;
+  patient_id: string;
   name: string;
   location: string;
   startDate: string; // "YYYY-MM-DD"
@@ -10,16 +11,18 @@ export interface Device {
 }
 
 export interface Exam {
-  id: number;
+  id: string;
+  patient_id: string;
   name: string;
   date: string; // "YYYY-MM-DD"
-  result: 'Pendente' | 'Normal' | 'Alterado';
+  result: 'Pendente' | 'Normal' | 'Alterado' | string;
   observation?: string;
   isArchived?: boolean;
 }
 
 export interface Medication {
-  id: number;
+  id: string;
+  patient_id: string;
   name: string;
   dosage: string;
   startDate: string; // "YYYY-MM-DD"
@@ -27,7 +30,7 @@ export interface Medication {
 }
 
 export interface Patient {
-  id: number;
+  id: string;
   name: string;
   bedNumber: number;
   motherName: string;
@@ -63,11 +66,11 @@ export interface Alert {
   patientId: number;
 }
 
-export type TaskStatus = 'alerta' | 'no_prazo' | 'fora_do_prazo' | 'concluido';
+export type TaskStatus = 'alerta' | 'no_prazo' | 'fora_do_prazo' | 'concluido' | string;
 
 export interface Task {
-  id: number;
-  patientId: number;
+  id: string;
+  patientId: string;
   categoryId: number;
   description: string;
   responsible: string;
@@ -90,21 +93,23 @@ export type Theme = 'light' | 'dark';
 
 export interface TasksContextType {
   tasks: Task[];
-  updateTaskJustification: (taskId: number, justification: string) => void;
-  updateTaskStatus: (taskId: number, status: TaskStatus) => void;
+  updateTaskJustification: (taskId: string, justification: string) => void;
+  updateTaskStatus: (taskId: string, status: TaskStatus) => void;
   addTask: (taskData: Omit<Task, 'id' | 'status' | 'justification'>) => void;
+  loading: boolean;
 }
 
 export interface PatientsContextType {
     patients: Patient[];
-    addDeviceToPatient: (patientId: number, device: Omit<Device, 'id'>) => void;
-    addExamToPatient: (patientId: number, exam: Omit<Exam, 'id'>) => void;
-    addMedicationToPatient: (patientId: number, medication: Omit<Medication, 'id'>) => void;
-    addRemovalDateToDevice: (patientId: number, deviceId: number, removalDate: string) => void;
-    deleteDeviceFromPatient: (patientId: number, deviceId: number) => void;
-    addEndDateToMedication: (patientId: number, medicationId: number, endDate: string) => void;
-    updateExamInPatient: (patientId: number, examData: Pick<Exam, 'id' | 'result' | 'observation'>) => void;
-    deleteExamFromPatient: (patientId: number, examId: number) => void;
+    addDeviceToPatient: (patientId: string, device: Omit<Device, 'id' | 'patient_id'>) => void;
+    addExamToPatient: (patientId: string, exam: Omit<Exam, 'id' | 'patient_id'>) => void;
+    addMedicationToPatient: (patientId: string, medication: Omit<Medication, 'id' | 'patient_id'>) => void;
+    addRemovalDateToDevice: (patientId: string, deviceId: string, removalDate: string) => void;
+    deleteDeviceFromPatient: (patientId: string, deviceId: string) => void;
+    addEndDateToMedication: (patientId: string, medicationId: string, endDate: string) => void;
+    updateExamInPatient: (patientId: string, examData: Pick<Exam, 'id' | 'result' | 'observation'>) => void;
+    deleteExamFromPatient: (patientId: string, examId: string) => void;
+    loading: boolean;
 }
 
 // --- NOTIFICATION TYPES ---

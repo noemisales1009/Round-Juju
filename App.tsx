@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useContext, useEffect, createContext, useRef } from 'react';
 import { HashRouter, Routes, Route, useNavigate, Link, useParams, useLocation, Outlet, NavLink, Navigate } from 'react-router-dom';
 import { Patient, Category, Question, ChecklistAnswer, Answer, Device, Exam, Medication, Task, TaskStatus, PatientsContextType, TasksContextType, NotificationState, NotificationContextType, User, UserContextType, Theme, ThemeContextType } from './types';
-import { PATIENTS as initialPatients, CATEGORIES, QUESTIONS, TASKS as initialTasks, DEVICE_TYPES, DEVICE_LOCATIONS, EXAM_STATUSES, RESPONSIBLES, ALERT_DEADLINES, INITIAL_USER } from './constants';
+import { CATEGORIES, QUESTIONS, DEVICE_TYPES, DEVICE_LOCATIONS, EXAM_STATUSES, RESPONSIBLES, ALERT_DEADLINES, INITIAL_USER } from './constants';
 import { BackArrowIcon, PlusIcon, WarningIcon, ClockIcon, AlertIcon, CheckCircleIcon, BedIcon, UserIcon, PencilIcon, BellIcon, InfoIcon, EyeOffIcon, ClipboardIcon, FileTextIcon, LogOutIcon, ChevronRightIcon, MenuIcon, DashboardIcon, CpuIcon, PillIcon, BarChartIcon, AppleIcon, DropletIcon, HeartPulseIcon, BeakerIcon, LiverIcon, LungsIcon, DumbbellIcon, BrainIcon, ShieldIcon, UsersIcon, HomeIcon, CloseIcon, SettingsIcon, CameraIcon } from './components/icons';
 import { supabase } from './src/integrations/supabase/client';
-import type { Session, AuthError } from '@supabase/supabase-js';
+import type { Session } from '@supabase/supabase-js';
 
 // --- CONTEXT for Global State ---
 const TasksContext = createContext<TasksContextType | null>(null);
@@ -64,7 +64,6 @@ const markCategoryAsCompletedForPatient = (patientId: string, categoryId: number
 // --- LAYOUT & NAVIGATION ---
 
 const Sidebar: React.FC = () => {
-    const navigate = useNavigate();
     const { user } = useContext(UserContext)!;
     const navItems = [
         { path: '/dashboard', label: 'Dashboard', icon: DashboardIcon },
@@ -278,7 +277,6 @@ const AuthScreen: React.FC = () => {
     const [name, setName] = useState('');
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
-    const navigate = useNavigate();
 
     const handleAuth = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -376,7 +374,7 @@ const AuthScreen: React.FC = () => {
 const DashboardScreen: React.FC = () => {
     useHeader('Dashboard');
     const navigate = useNavigate();
-    const { tasks } = useContext(TasksContext)!;
+    const { tasks, loading } = useContext(TasksContext)!;
 
     const summaryData = useMemo(() => {
         const counts = tasks.reduce((acc, task) => {
@@ -409,6 +407,10 @@ const DashboardScreen: React.FC = () => {
             };
         });
     }, [tasks]);
+
+    if (loading) {
+        return <div className="text-center p-8">Carregando dashboard...</div>;
+    }
 
     return (
         <div className="space-y-8">
@@ -454,7 +456,7 @@ const DashboardScreen: React.FC = () => {
 
 const PatientListScreen: React.FC = () => {
     useHeader('Leitos');
-    const { patients } = useContext(PatientsContext)!;
+    const { patients, loading } = useContext(PatientsContext)!;
     const [searchTerm, setSearchTerm] = useState('');
 
     const filteredPatients = useMemo(() => {
@@ -464,10 +466,14 @@ const PatientListScreen: React.FC = () => {
         );
     }, [patients, searchTerm]);
     
-    const calculateProgress = (patientId: number) => {
-        const completed = getCompletedCategoriesForPatient(patientId.toString());
+    const calculateProgress = (patientId: string) => {
+        const completed = getCompletedCategoriesForPatient(patientId);
         return (completed.length / CATEGORIES.length) * 100;
     };
+
+    if (loading) {
+        return <div className="text-center p-8">Carregando pacientes...</div>;
+    }
 
     return (
         <div className="space-y-4">
@@ -532,7 +538,7 @@ const PatientHistoryScreen: React.FC = () => {
     const { patientId } = useParams<{ patientId: string }>();
     const { patients } = useContext(PatientsContext)!;
     const { tasks } = useContext(TasksContext)!;
-    const patient = patients.find(p => p.id.toString() === patientId);
+    const patient = patients.find(p => p.id === patientId);
 
     useHeader(patient ? `Histórico: ${patient.name}` : 'Histórico do Paciente');
 
@@ -770,8 +776,8 @@ const PatientHistoryScreen: React.FC = () => {
 
 const PatientDetailScreen: React.FC = () => {
     const { patientId } = useParams<{ patientId: string }>();
-    const { patients, addRemovalDateToDevice, deleteDeviceFromPatient, addEndDateToMedication, deleteExamFromPatient } = useContext(PatientsContext)!;
-    const patient = patients.find(p => p.id.toString() === patientId);
+    const { patients, deleteDeviceFromPatient, deleteExamFromPatient } = useContext(PatientsContext)!;
+    const patient = patients.find(p => p.id === patientId);
     
     useHeader(patient ? `Leito ${patient.bedNumber}` : 'Paciente não encontrado');
 
@@ -780,8 +786,8 @@ const PatientDetailScreen: React.FC = () => {
     const [isAddExamModalOpen, setAddExamModalOpen] = useState(false);
     const [editingExam, setEditingExam] = useState<Exam | null>(null);
     const [isAddMedicationModalOpen, setAddMedicationModalOpen] = useState(false);
-    const [isRemovalModalOpen, setRemovalModalOpen] = useState<number | null>(null);
-    const [isEndDateModalOpen, setEndDateModalOpen] = useState<number | null>(null);
+    const [isRemovalModalOpen, setRemovalModalOpen] = useState<string | null>(null);
+    const [isEndDateModalOpen, setEndDateModalOpen] = useState<string | null>(null);
 
     const { showNotification } = useContext(NotificationContext)!;
 
@@ -789,12 +795,12 @@ const PatientDetailScreen: React.FC = () => {
         return <p>Paciente não encontrado.</p>;
     }
     
-    const handleDeleteDevice = (patientId: number, deviceId: number) => {
+    const handleDeleteDevice = (patientId: string, deviceId: string) => {
         deleteDeviceFromPatient(patientId, deviceId);
         showNotification({ message: 'Dispositivo arquivado, mantido no histórico.', type: 'info' });
     };
 
-    const handleDeleteExam = (patientId: number, examId: number) => {
+    const handleDeleteExam = (patientId: string, examId: string) => {
         deleteExamFromPatient(patientId, examId);
         showNotification({ message: 'Exame arquivado com sucesso.', type: 'info' });
     };
@@ -959,7 +965,7 @@ const PatientDetailScreen: React.FC = () => {
 };
 
 // Modals
-const AddDeviceModal: React.FC<{ patientId: number; onClose: () => void;}> = ({ patientId, onClose }) => {
+const AddDeviceModal: React.FC<{ patientId: string; onClose: () => void;}> = ({ patientId, onClose }) => {
     const { addDeviceToPatient } = useContext(PatientsContext)!;
     const { showNotification } = useContext(NotificationContext)!;
     const [type, setType] = useState('');
@@ -1007,7 +1013,7 @@ const AddDeviceModal: React.FC<{ patientId: number; onClose: () => void;}> = ({ 
     );
 };
 
-const AddExamModal: React.FC<{ patientId: number; onClose: () => void;}> = ({ patientId, onClose }) => {
+const AddExamModal: React.FC<{ patientId: string; onClose: () => void;}> = ({ patientId, onClose }) => {
     const { addExamToPatient } = useContext(PatientsContext)!;
     const { showNotification } = useContext(NotificationContext)!;
     const [name, setName] = useState('');
@@ -1056,7 +1062,7 @@ const AddExamModal: React.FC<{ patientId: number; onClose: () => void;}> = ({ pa
     );
 };
 
-const EditExamModal: React.FC<{ exam: Exam; patientId: number; onClose: () => void;}> = ({ exam, patientId, onClose }) => {
+const EditExamModal: React.FC<{ exam: Exam; patientId: string; onClose: () => void;}> = ({ exam, patientId, onClose }) => {
     const { updateExamInPatient } = useContext(PatientsContext)!;
     const { showNotification } = useContext(NotificationContext)!;
     
@@ -1099,7 +1105,7 @@ const EditExamModal: React.FC<{ exam: Exam; patientId: number; onClose: () => vo
     );
 };
 
-const AddMedicationModal: React.FC<{ patientId: number; onClose: () => void;}> = ({ patientId, onClose }) => {
+const AddMedicationModal: React.FC<{ patientId: string; onClose: () => void;}> = ({ patientId, onClose }) => {
     const { addMedicationToPatient } = useContext(PatientsContext)!;
      const { showNotification } = useContext(NotificationContext)!;
     const [name, setName] = useState('');
@@ -1141,7 +1147,7 @@ const AddMedicationModal: React.FC<{ patientId: number; onClose: () => void;}> =
     );
 };
 
-const AddRemovalDateModal: React.FC<{ deviceId: number, patientId: number, onClose: () => void }> = ({ deviceId, patientId, onClose }) => {
+const AddRemovalDateModal: React.FC<{ deviceId: string, patientId: string, onClose: () => void }> = ({ deviceId, patientId, onClose }) => {
     const { addRemovalDateToDevice } = useContext(PatientsContext)!;
     const [removalDate, setRemovalDate] = useState(new Date().toISOString().split('T')[0]);
 
@@ -1169,7 +1175,7 @@ const AddRemovalDateModal: React.FC<{ deviceId: number, patientId: number, onClo
         </div>
     );
 };
-const AddEndDateModal: React.FC<{ medicationId: number, patientId: number, onClose: () => void }> = ({ medicationId, patientId, onClose }) => {
+const AddEndDateModal: React.FC<{ medicationId: string, patientId: string, onClose: () => void }> = ({ medicationId, patientId, onClose }) => {
     const { addEndDateToMedication } = useContext(PatientsContext)!;
     const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
 
@@ -1200,7 +1206,7 @@ const AddEndDateModal: React.FC<{ medicationId: number, patientId: number, onClo
 const RoundCategoryListScreen: React.FC = () => {
     const { patientId } = useParams<{ patientId: string }>();
     const { patients } = useContext(PatientsContext)!;
-    const patient = patients.find(p => p.id.toString() === patientId);
+    const patient = patients.find(p => p.id === patientId);
 
     useHeader('Round: Categorias');
     
@@ -1235,7 +1241,7 @@ const ChecklistScreen: React.FC = () => {
     const { patientId, categoryId } = useParams<{ patientId: string, categoryId: string }>();
     const { patients } = useContext(PatientsContext)!;
     
-    const patient = patients.find(p => p.id.toString() === patientId);
+    const patient = patients.find(p => p.id === patientId);
     const category = CATEGORIES.find(c => c.id.toString() === categoryId);
     const questions = QUESTIONS.filter(q => q.categoryId.toString() === categoryId);
     const navigate = useNavigate();
@@ -1342,7 +1348,7 @@ const CreateAlertScreen: React.FC = () => {
     const { showNotification } = useContext(NotificationContext)!;
     const navigate = useNavigate();
     
-    const patient = patients.find(p => p.id.toString() === patientId);
+    const patient = patients.find(p => p.id === patientId);
     const category = categoryId ? CATEGORIES.find(c => c.id.toString() === categoryId) : null;
 
     const [description, setDescription] = useState('');
@@ -1359,7 +1365,7 @@ const CreateAlertScreen: React.FC = () => {
         const deadlineDate = new Date(Date.now() + deadlineHours * 60 * 60 * 1000).toISOString();
 
         addTask({
-            patientId: parseInt(patientId),
+            patientId: patientId,
             categoryId: category ? category.id : 0, // 0 for general alerts
             description,
             responsible,
@@ -1450,7 +1456,7 @@ const TaskStatusScreen: React.FC = () => {
         setJustificationModal(null);
     };
     
-    const handleCompleteTask = (taskId: number) => {
+    const handleCompleteTask = (taskId: string) => {
         if(window.confirm('Tem certeza que deseja marcar esta tarefa como concluída?')){
             updateTaskStatus(taskId, 'concluido');
         }
@@ -1534,6 +1540,12 @@ const SettingsScreen: React.FC = () => {
     const [title, setTitle] = useState(user.title);
     const [avatarPreview, setAvatarPreview] = useState(user.avatarUrl);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        setName(user.name);
+        setTitle(user.title);
+        setAvatarPreview(user.avatarUrl);
+    }, [user]);
 
     const handleSave = () => {
         updateUser({ name, title, avatarUrl: avatarPreview });
@@ -1627,91 +1639,90 @@ const SettingsScreen: React.FC = () => {
 // --- PROVIDERS for Global State ---
 
 const PatientsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [patients, setPatients] = useState<Patient[]>(initialPatients);
+    const [patients, setPatients] = useState<Patient[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    const addDeviceToPatient = (patientId: number, device: Omit<Device, 'id'>) => {
-        const newDevice = { ...device, id: Date.now() };
-        setPatients(prevPatients => prevPatients.map(p => 
-            p.id === patientId ? { ...p, devices: [...p.devices, newDevice] } : p
-        ));
-    };
+    const fetchPatients = async () => {
+        setLoading(true);
+        const { data: patientsData, error: patientsError } = await supabase.from('patients').select('*');
+        if (patientsError) {
+            console.error("Error fetching patients:", patientsError);
+            setLoading(false);
+            return;
+        }
 
-    const addExamToPatient = (patientId: number, exam: Omit<Exam, 'id'>) => {
-        const newExam = { ...exam, id: Date.now() };
-        setPatients(prevPatients => prevPatients.map(p => 
-            p.id === patientId ? { ...p, exams: [...p.exams, newExam] } : p
-        ));
-    };
+        const { data: devicesData, error: devicesError } = await supabase.from('devices').select('*');
+        if (devicesError) console.error("Error fetching devices:", devicesError);
 
-    const addMedicationToPatient = (patientId: number, medication: Omit<Medication, 'id'>) => {
-        const newMedication = { ...medication, id: Date.now() };
-        setPatients(prevPatients => prevPatients.map(p => 
-            p.id === patientId ? { ...p, medications: [...p.medications, newMedication] } : p
-        ));
-    };
+        const { data: examsData, error: examsError } = await supabase.from('exams').select('*');
+        if (examsError) console.error("Error fetching exams:", examsError);
 
-    const addRemovalDateToDevice = (patientId: number, deviceId: number, removalDate: string) => {
-        setPatients(prevPatients => prevPatients.map(p => {
-            if (p.id === patientId) {
-                return {
-                    ...p,
-                    devices: p.devices.map(d => d.id === deviceId ? { ...d, removalDate } : d)
-                };
-            }
-            return p;
+        const { data: medicationsData, error: medicationsError } = await supabase.from('medications').select('*');
+        if (medicationsError) console.error("Error fetching medications:", medicationsError);
+
+        const combinedData = patientsData.map(p => ({
+            ...p,
+            bedNumber: p.bed_number,
+            motherName: p.mother_name,
+            devices: devicesData?.filter(d => d.patient_id === p.id).map(d => ({...d, startDate: d.start_date, removalDate: d.removal_date, isArchived: d.is_archived})) || [],
+            exams: examsData?.filter(e => e.patient_id === p.id).map(e => ({...e, isArchived: e.is_archived})) || [],
+            medications: medicationsData?.filter(m => m.patient_id === p.id).map(m => ({...m, startDate: m.start_date, endDate: m.end_date})) || [],
         }));
+
+        setPatients(combinedData);
+        setLoading(false);
+    };
+
+    useEffect(() => {
+        fetchPatients();
+    }, []);
+
+    const addDeviceToPatient = async (patientId: string, device: Omit<Device, 'id' | 'patient_id'>) => {
+        const { data, error } = await supabase.from('devices').insert([{ ...device, patient_id: patientId, start_date: device.startDate }]).select();
+        if (error) console.error("Error adding device:", error);
+        else if (data) fetchPatients();
+    };
+
+    const addExamToPatient = async (patientId: string, exam: Omit<Exam, 'id' | 'patient_id'>) => {
+        const { data, error } = await supabase.from('exams').insert([{ ...exam, patient_id: patientId }]).select();
+        if (error) console.error("Error adding exam:", error);
+        else if (data) fetchPatients();
+    };
+
+    const addMedicationToPatient = async (patientId: string, medication: Omit<Medication, 'id' | 'patient_id'>) => {
+        const { data, error } = await supabase.from('medications').insert([{ ...medication, patient_id: patientId, start_date: medication.startDate }]).select();
+        if (error) console.error("Error adding medication:", error);
+        else if (data) fetchPatients();
+    };
+
+    const addRemovalDateToDevice = async (patientId: string, deviceId: string, removalDate: string) => {
+        const { error } = await supabase.from('devices').update({ removal_date: removalDate }).eq('id', deviceId);
+        if (error) console.error("Error updating device:", error);
+        else fetchPatients();
     };
     
-    const deleteDeviceFromPatient = (patientId: number, deviceId: number) => {
-        setPatients(prevPatients => prevPatients.map(p => {
-            if (p.id === patientId) {
-                return {
-                    ...p,
-                    devices: p.devices.map(d => d.id === deviceId ? { ...d, isArchived: true } : d)
-                };
-            }
-            return p;
-        }));
+    const deleteDeviceFromPatient = async (patientId: string, deviceId: string) => {
+        const { error } = await supabase.from('devices').update({ is_archived: true }).eq('id', deviceId);
+        if (error) console.error("Error archiving device:", error);
+        else fetchPatients();
     };
 
-    const addEndDateToMedication = (patientId: number, medicationId: number, endDate: string) => {
-        setPatients(prevPatients => prevPatients.map(p => {
-            if (p.id === patientId) {
-                return {
-                    ...p,
-                    medications: p.medications.map(m => m.id === medicationId ? { ...m, endDate } : m)
-                };
-            }
-            return p;
-        }));
+    const addEndDateToMedication = async (patientId: string, medicationId: string, endDate: string) => {
+        const { error } = await supabase.from('medications').update({ end_date: endDate }).eq('id', medicationId);
+        if (error) console.error("Error updating medication:", error);
+        else fetchPatients();
     };
     
-    const updateExamInPatient = (patientId: number, examData: Pick<Exam, 'id' | 'result' | 'observation'>) => {
-        setPatients(prevPatients => prevPatients.map(p => {
-            if (p.id === patientId) {
-                return {
-                    ...p,
-                    exams: p.exams.map(e =>
-                        e.id === examData.id
-                        ? { ...e, result: examData.result, observation: examData.observation || undefined }
-                        : e
-                    )
-                };
-            }
-            return p;
-        }));
+    const updateExamInPatient = async (patientId: string, examData: Pick<Exam, 'id' | 'result' | 'observation'>) => {
+        const { error } = await supabase.from('exams').update({ result: examData.result, observation: examData.observation }).eq('id', examData.id);
+        if (error) console.error("Error updating exam:", error);
+        else fetchPatients();
     };
 
-    const deleteExamFromPatient = (patientId: number, examId: number) => {
-        setPatients(prevPatients => prevPatients.map(p => {
-            if (p.id === patientId) {
-                return {
-                    ...p,
-                    exams: p.exams.map(e => e.id === examId ? { ...e, isArchived: true } : e)
-                };
-            }
-            return p;
-        }));
+    const deleteExamFromPatient = async (patientId: string, examId: string) => {
+        const { error } = await supabase.from('exams').update({ is_archived: true }).eq('id', examId);
+        if (error) console.error("Error archiving exam:", error);
+        else fetchPatients();
     };
 
 
@@ -1725,6 +1736,7 @@ const PatientsProvider: React.FC<{ children: React.ReactNode }> = ({ children })
         addEndDateToMedication,
         updateExamInPatient,
         deleteExamFromPatient,
+        loading,
     };
 
     return <PatientsContext.Provider value={value as PatientsContextType}>{children}</PatientsContext.Provider>;
@@ -1732,34 +1744,60 @@ const PatientsProvider: React.FC<{ children: React.ReactNode }> = ({ children })
 
 
 const TasksProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [tasks, setTasks] = useState<Task[]>(initialTasks);
+    const [tasks, setTasks] = useState<Task[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    const updateTaskJustification = (taskId: number, justification: string) => {
-        setTasks(prevTasks => prevTasks.map(t => 
-            t.id === taskId ? { ...t, justification } : t
-        ));
+    const fetchTasks = async () => {
+        setLoading(true);
+        const { data, error } = await supabase.from('tasks').select('*');
+        if (error) {
+            console.error("Error fetching tasks:", error);
+        } else {
+            const formattedTasks = data.map(t => ({
+                ...t,
+                patientId: t.patient_id,
+                categoryId: t.category_id,
+            }));
+            setTasks(formattedTasks);
+        }
+        setLoading(false);
+    };
+
+    useEffect(() => {
+        fetchTasks();
+    }, []);
+
+    const updateTaskJustification = async (taskId: string, justification: string) => {
+        const { error } = await supabase.from('tasks').update({ justification }).eq('id', taskId);
+        if (error) console.error("Error updating task justification:", error);
+        else fetchTasks();
     };
     
-     const updateTaskStatus = (taskId: number, status: TaskStatus) => {
-        setTasks(prevTasks => prevTasks.map(t => 
-            t.id === taskId ? { ...t, status } : t
-        ));
+     const updateTaskStatus = async (taskId: string, status: TaskStatus) => {
+        const { error } = await supabase.from('tasks').update({ status }).eq('id', taskId);
+        if (error) console.error("Error updating task status:", error);
+        else fetchTasks();
     };
 
-    const addTask = (taskData: Omit<Task, 'id' | 'status' | 'justification'>) => {
-        const newTask: Task = {
-            ...taskData,
-            id: Date.now(),
+    const addTask = async (taskData: Omit<Task, 'id' | 'status' | 'justification'>) => {
+        const { error } = await supabase.from('tasks').insert([{
+            patient_id: taskData.patientId,
+            category_id: taskData.categoryId,
+            description: taskData.description,
+            responsible: taskData.responsible,
+            deadline: taskData.deadline,
             status: 'alerta'
-        };
-        setTasks(prev => [newTask, ...prev]);
+        }]);
+        if (error) console.error("Error adding task:", error);
+        else fetchTasks();
     };
 
     const value = {
         tasks,
         updateTaskJustification,
         updateTaskStatus,
-        addTask
+        addTask,
+        loading,
     };
 
     return <TasksContext.Provider value={value}>{children}</TasksContext.Provider>;
@@ -1786,8 +1824,41 @@ const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User>(INITIAL_USER);
 
-    const updateUser = (userData: Partial<User>) => {
-        setUser(prev => ({ ...prev, ...userData }));
+    const fetchUser = async () => {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (authUser) {
+            const { data, error } = await supabase.from('users').select('*').eq('id', authUser.id).single();
+            if (error) {
+                console.error("Error fetching user profile:", error);
+            } else if (data) {
+                setUser({
+                    name: data.name || 'Usuário',
+                    title: data.role || 'Cargo',
+                    avatarUrl: data.foto || `https://i.pravatar.cc/150?u=${data.id}`,
+                });
+            }
+        }
+    };
+
+    useEffect(() => {
+        fetchUser();
+    }, []);
+
+    const updateUser = async (userData: Partial<User>) => {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (!authUser) return;
+
+        const { error } = await supabase.from('users').update({
+            name: userData.name,
+            role: userData.title,
+            foto: userData.avatarUrl,
+        }).eq('id', authUser.id);
+
+        if (error) {
+            console.error("Error updating user profile:", error);
+        } else {
+            setUser(prev => ({ ...prev, ...userData }));
+        }
     };
 
     return (
@@ -1852,7 +1923,7 @@ const App: React.FC = () => {
     }, []);
 
     if (loading) {
-        return <div>Carregando...</div>;
+        return <div className="flex items-center justify-center h-screen">Carregando...</div>;
     }
 
     return (
