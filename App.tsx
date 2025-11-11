@@ -1488,7 +1488,15 @@ const TaskStatusScreen: React.FC = () => {
 
     const [justificationModal, setJustificationModal] = useState<Task | null>(null);
 
-    const filteredTasks = tasks.filter((t: Task) => t.status === status);
+    const filteredTasks = useMemo(() => {
+        if (!status) return [];
+        if (status === 'alerta') {
+            // The dashboard counts alerts that are not yet concluded.
+            return tasks.filter(t => t.status === 'alerta' && t.live_status !== 'concluido');
+        }
+        // For other statuses, we filter by the live, calculated status.
+        return tasks.filter((t: Task) => t.live_status === status);
+    }, [tasks, status]);
     
     const statusConfig = {
         alerta: { title: 'Alertas', icon: WarningIcon, color: 'yellow' },
@@ -1518,8 +1526,10 @@ const TaskStatusScreen: React.FC = () => {
             {filteredTasks.map((task: Task) => {
                 const patient = patients.find((p: Patient) => p.id === task.patientId);
                 const category = CATEGORIES.find(c => c.id === task.categoryId);
+                const currentTaskConfig = statusConfig[task.live_status as TaskStatus] || config;
+
                 return (
-                    <div key={task.id} className={`bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border-l-4 border-${config.color}-500`}>
+                    <div key={task.id} className={`bg-white dark:bg-slate-900 p-4 rounded-xl shadow-sm border-l-4 border-${currentTaskConfig.color}-500`}>
                         <div className="flex justify-between items-start">
                              <div>
                                 <p className="font-bold text-slate-800 dark:text-slate-200">{task.description}</p>
@@ -1531,18 +1541,18 @@ const TaskStatusScreen: React.FC = () => {
                             </div>
                             <div className="text-right flex-shrink-0 ml-2">
                                 <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">Prazo:</p>
-                                <p className={`text-sm font-bold text-${config.color}-600 dark:text-${config.color}-400`}>
+                                <p className={`text-sm font-bold text-${currentTaskConfig.color}-600 dark:text-${currentTaskConfig.color}-400`}>
                                     {new Date(task.deadline).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                                 </p>
                             </div>
                         </div>
-                        {status === 'fora_do_prazo' && (
+                        {task.live_status === 'fora_do_prazo' && (
                             <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-800 flex gap-2">
                                 <button onClick={() => setJustificationModal(task)} className="text-xs bg-blue-100 dark:bg-blue-900/80 text-blue-700 dark:text-blue-300 font-semibold px-3 py-1.5 rounded-md hover:bg-blue-200 dark:hover:bg-blue-900">Justificar Atraso</button>
                                 <button onClick={() => handleCompleteTask(task.id)} className="text-xs bg-green-100 dark:bg-green-900/80 text-green-700 dark:text-green-300 font-semibold px-3 py-1.5 rounded-md hover:bg-green-200 dark:hover:bg-green-900">Concluir</button>
                             </div>
                         )}
-                        {status !== 'concluido' && status !== 'fora_do_prazo' && (
+                        {task.live_status !== 'concluido' && task.live_status !== 'fora_do_prazo' && (
                              <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-800 flex gap-2">
                                  <button onClick={() => handleCompleteTask(task.id)} className="text-xs bg-green-100 dark:bg-green-900/80 text-green-700 dark:text-green-300 font-semibold px-3 py-1.5 rounded-md hover:bg-green-200 dark:hover:bg-green-900">Marcar como Concluída</button>
                              </div>
@@ -1805,7 +1815,7 @@ const TasksProvider: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
     const fetchTasks = async () => {
         setLoading(true);
-        const { data, error } = await supabase.from('tasks').select('*');
+        const { data, error } = await supabase.from('tasks_status_view').select('*');
         if (error) {
             console.error("Error fetching tasks:", error);
         } else {
@@ -1835,7 +1845,7 @@ const TasksProvider: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         else fetchTasks();
     };
 
-    const addTask = async (taskData: Omit<Task, 'id' | 'status' | 'justification'>) => {
+    const addTask = async (taskData: Omit<Task, 'id' | 'status' | 'justification' | 'live_status'>) => {
         const { error } = await supabase.from('tasks').insert([{
             patient_id: taskData.patientId,
             category_id: taskData.categoryId,

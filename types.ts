@@ -78,6 +78,7 @@ export interface Task {
   deadline: string; // ISO String for date and time
   status: TaskStatus;
   justification?: string;
+  live_status?: TaskStatus;
 }
 
 // --- USER & THEME ---
@@ -96,7 +97,7 @@ export interface TasksContextType {
   tasks: Task[];
   updateTaskJustification: (taskId: string, justification: string) => void;
   updateTaskStatus: (taskId: string, status: TaskStatus) => void;
-  addTask: (taskData: Omit<Task, 'id' | 'status' | 'justification'>) => void;
+  addTask: (taskData: Omit<Task, 'id' | 'status' | 'justification' | 'live_status'>) => void;
   loading: boolean;
 }
 
