@@ -1,14 +1,10 @@
-
-
-
-
-
-
 import React, { useState, useMemo, useContext, useEffect, createContext, useRef } from 'react';
-import { HashRouter, Routes, Route, useNavigate, Link, useParams, useLocation, Outlet, NavLink } from 'react-router-dom';
+import { HashRouter, Routes, Route, useNavigate, Link, useParams, useLocation, Outlet, NavLink, Navigate } from 'react-router-dom';
 import { Patient, Category, Question, ChecklistAnswer, Answer, Device, Exam, Medication, Task, TaskStatus, PatientsContextType, TasksContextType, NotificationState, NotificationContextType, User, UserContextType, Theme, ThemeContextType } from './types';
 import { PATIENTS as initialPatients, CATEGORIES, QUESTIONS, TASKS as initialTasks, DEVICE_TYPES, DEVICE_LOCATIONS, EXAM_STATUSES, RESPONSIBLES, ALERT_DEADLINES, INITIAL_USER } from './constants';
 import { BackArrowIcon, PlusIcon, WarningIcon, ClockIcon, AlertIcon, CheckCircleIcon, BedIcon, UserIcon, PencilIcon, BellIcon, InfoIcon, EyeOffIcon, ClipboardIcon, FileTextIcon, LogOutIcon, ChevronRightIcon, MenuIcon, DashboardIcon, CpuIcon, PillIcon, BarChartIcon, AppleIcon, DropletIcon, HeartPulseIcon, BeakerIcon, LiverIcon, LungsIcon, DumbbellIcon, BrainIcon, ShieldIcon, UsersIcon, HomeIcon, CloseIcon, SettingsIcon, CameraIcon } from './components/icons';
+import { supabase } from './src/integrations/supabase/client';
+import type { Session, AuthError } from '@supabase/supabase-js';
 
 // --- CONTEXT for Global State ---
 const TasksContext = createContext<TasksContextType | null>(null);
@@ -110,7 +106,10 @@ const Sidebar: React.FC = () => {
                      </div>
                 </div>
                 <button 
-                    onClick={() => navigate('/')} 
+                    onClick={async () => {
+                        const { error } = await supabase.auth.signOut();
+                        if (error) console.error('Erro ao sair:', error.message);
+                    }} 
                     className="w-full flex items-center justify-center space-x-2 px-3 py-2.5 rounded-lg font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900 dark:hover:text-red-300 transition"
                 >
                     <LogOutIcon className="w-5 h-5"/>
@@ -272,15 +271,43 @@ const Notification: React.FC<{ message: string; type: 'success' | 'error' | 'inf
 
 // --- SCREENS ---
 
-const LoginScreen: React.FC = () => {
-    const navigate = useNavigate();
+const AuthScreen: React.FC = () => {
+    const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [name, setName] = useState('');
+    const [error, setError] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
+    const navigate = useNavigate();
 
-    const handleLogin = (e: React.FormEvent) => {
+    const handleAuth = async (e: React.FormEvent) => {
         e.preventDefault();
-        // For now, any input allows login
-        navigate('/dashboard');
+        setLoading(true);
+        setError(null);
+
+        try {
+            if (isLogin) {
+                const { error } = await supabase.auth.signInWithPassword({ email, password });
+                if (error) throw error;
+            } else {
+                const { error } = await supabase.auth.signUp({
+                    email,
+                    password,
+                    options: {
+                        data: {
+                            name: name
+                        }
+                    }
+                });
+                if (error) throw error;
+                alert('Cadastro realizado! Verifique seu email para confirmar sua conta.');
+                setIsLogin(true);
+            }
+        } catch (error: any) {
+            setError(error.message);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -288,10 +315,24 @@ const LoginScreen: React.FC = () => {
             <div className="p-8 bg-white dark:bg-slate-900 rounded-xl shadow-lg max-w-sm w-full m-4">
                 <div className="text-center mb-8">
                     <ClipboardIcon className="w-16 h-16 text-blue-600 dark:text-blue-400 mx-auto mb-4" />
-                    <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-200">Bem-vindo de volta!</h1>
-                    <p className="text-slate-500 dark:text-slate-400">Faça login para continuar.</p>
+                    <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-200">{isLogin ? 'Bem-vindo de volta!' : 'Crie sua conta'}</h1>
+                    <p className="text-slate-500 dark:text-slate-400">{isLogin ? 'Faça login para continuar.' : 'Preencha os campos para se cadastrar.'}</p>
                 </div>
-                <form onSubmit={handleLogin} className="space-y-6">
+                {error && <p className="bg-red-100 text-red-700 p-3 rounded-lg mb-4 text-center">{error}</p>}
+                <form onSubmit={handleAuth} className="space-y-6">
+                    {!isLogin && (
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome</label>
+                            <input
+                                type="text"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                placeholder="Seu nome completo"
+                                className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition text-slate-800 dark:text-slate-200"
+                                required
+                            />
+                        </div>
+                    )}
                     <div>
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Email</label>
                         <input
@@ -316,11 +357,17 @@ const LoginScreen: React.FC = () => {
                     </div>
                     <button
                         type="submit"
-                        className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg transition text-lg flex items-center justify-center gap-2"
+                        disabled={loading}
+                        className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg transition text-lg flex items-center justify-center gap-2 disabled:opacity-50"
                     >
-                        Entrar
+                        {loading ? 'Aguarde...' : (isLogin ? 'Entrar' : 'Cadastrar')}
                     </button>
                 </form>
+                <div className="text-center mt-6">
+                    <button onClick={() => setIsLogin(!isLogin)} className="text-sm text-blue-600 hover:underline">
+                        {isLogin ? 'Não tem uma conta? Cadastre-se' : 'Já tem uma conta? Faça login'}
+                    </button>
+                </div>
             </div>
         </div>
     );
@@ -345,15 +392,11 @@ const DashboardScreen: React.FC = () => {
     }, [tasks]);
 
     const alertChartData = useMemo(() => {
-        // Fix: The accumulator's record key type was changed from number to string.
-        // This aligns with JavaScript's behavior where object keys are strings,
-        // ensuring Object.entries provides correct types and fixing subsequent arithmetic errors.
         const counts = tasks.filter(t => t.status === 'alerta').reduce((acc, task) => {
             acc[task.categoryId] = (acc[task.categoryId] || 0) + 1;
             return acc;
         }, {} as Record<string, number>);
 
-        // FIX: Explicitly cast the result of `Object.entries` to `[string, number][]`. This ensures TypeScript correctly infers `count` variables as numbers, resolving multiple downstream arithmetic errors.
         const sorted = (Object.entries(counts) as [string, number][]).sort(([, countA], [, countB]) => countB - countA);
         const maxCount = Math.max(...sorted.map(([, count]) => count), 0);
         
@@ -605,7 +648,6 @@ const PatientHistoryScreen: React.FC = () => {
             <div class="history-group">
                 <h3>${formatHistoryDate(date)}</h3>
                 <ul>
-                    {/* Cast eventsOnDate to TimelineEvent[] as type inference struggles with the union type of patientHistory. */}
                     ${(eventsOnDate as TimelineEvent[]).map(event => `
                         <li>
                             ${event.hasTime ? `[${new Date(event.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}] ` : ''}
@@ -944,7 +986,6 @@ const AddDeviceModal: React.FC<{ patientId: number; onClose: () => void;}> = ({ 
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Tipo</label>
                         <select value={type} onChange={e => setType(e.target.value)} className="mt-1 block w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-slate-800 dark:text-slate-200">
                             <option value="" disabled>Select...</option>
-                            {/* Removed redundant type cast as DEVICE_TYPES is already string[] */}
                             {DEVICE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                     </div>
@@ -1789,6 +1830,31 @@ const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 // --- MAIN APP ---
 
 const App: React.FC = () => {
+    const [session, setSession] = useState<Session | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const getSession = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            setSession(session);
+            setLoading(false);
+        };
+
+        getSession();
+
+        const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+            setSession(session);
+        });
+
+        return () => {
+            authListener.subscription.unsubscribe();
+        };
+    }, []);
+
+    if (loading) {
+        return <div>Carregando...</div>;
+    }
+
     return (
         <HashRouter>
             <NotificationProvider>
@@ -1797,19 +1863,24 @@ const App: React.FC = () => {
                 <PatientsProvider>
                 <TasksProvider>
                     <Routes>
-                        <Route path="/" element={<LoginScreen />} />
-                        <Route path="/" element={<AppLayout />}>
-                            <Route path="dashboard" element={<DashboardScreen />} />
-                            <Route path="patients" element={<PatientListScreen />} />
-                            <Route path="patient/:patientId" element={<PatientDetailScreen />} />
-                            <Route path="patient/:patientId/history" element={<PatientHistoryScreen />} />
-                            <Route path="patient/:patientId/round/categories" element={<RoundCategoryListScreen />} />
-                            <Route path="patient/:patientId/round/category/:categoryId" element={<ChecklistScreen />} />
-                            <Route path="patient/:patientId/round/category/:categoryId/create-alert" element={<CreateAlertScreen />} />
-                            <Route path="patient/:patientId/create-alert" element={<CreateAlertScreen />} />
-                            <Route path="status/:status" element={<TaskStatusScreen />} />
-                            <Route path="settings" element={<SettingsScreen />} />
-                        </Route>
+                        {!session ? (
+                            <Route path="*" element={<AuthScreen />} />
+                        ) : (
+                            <Route path="/" element={<AppLayout />}>
+                                <Route index element={<Navigate to="/dashboard" replace />} />
+                                <Route path="dashboard" element={<DashboardScreen />} />
+                                <Route path="patients" element={<PatientListScreen />} />
+                                <Route path="patient/:patientId" element={<PatientDetailScreen />} />
+                                <Route path="patient/:patientId/history" element={<PatientHistoryScreen />} />
+                                <Route path="patient/:patientId/round/categories" element={<RoundCategoryListScreen />} />
+                                <Route path="patient/:patientId/round/category/:categoryId" element={<ChecklistScreen />} />
+                                <Route path="patient/:patientId/round/category/:categoryId/create-alert" element={<CreateAlertScreen />} />
+                                <Route path="patient/:patientId/create-alert" element={<CreateAlertScreen />} />
+                                <Route path="status/:status" element={<TaskStatusScreen />} />
+                                <Route path="settings" element={<SettingsScreen />} />
+                                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                            </Route>
+                        )}
                     </Routes>
                 </TasksProvider>
                 </PatientsProvider>
