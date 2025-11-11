@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useContext, useEffect, createContext, useRef } from 'react';
-import { HashRouter, Routes, Route, useNavigate, Link, useParams, useLocation, Outlet, NavLink } from 'react-router-dom';
+import { HashRouter, Routes, Route, useNavigate, Link, useParams, useLocation, Outlet, NavLink, Navigate } from 'react-router-dom';
 import { Patient, Category, Question, ChecklistAnswer, Answer, Device, Exam, Medication, Task, TaskStatus, PatientsContextType, TasksContextType, NotificationState, NotificationContextType, User, UserContextType, Theme, ThemeContextType } from './types';
 import { PATIENTS as initialPatients, CATEGORIES, QUESTIONS, TASKS as initialTasks, DEVICE_TYPES, DEVICE_LOCATIONS, EXAM_STATUSES, RESPONSIBLES, ALERT_DEADLINES, INITIAL_USER } from './constants';
 import { BackArrowIcon, PlusIcon, WarningIcon, ClockIcon, AlertIcon, CheckCircleIcon, BedIcon, UserIcon, PencilIcon, BellIcon, InfoIcon, EyeOffIcon, ClipboardIcon, FileTextIcon, LogOutIcon, ChevronRightIcon, MenuIcon, DashboardIcon, CpuIcon, PillIcon, BarChartIcon, AppleIcon, DropletIcon, HeartPulseIcon, BeakerIcon, LiverIcon, LungsIcon, DumbbellIcon, BrainIcon, ShieldIcon, UsersIcon, HomeIcon, CloseIcon, SettingsIcon, CameraIcon } from './components/icons';
@@ -7,6 +7,10 @@ import { useSupabasePatients } from './src/hooks/useSupabasePatients';
 import { useSupabaseTasks } from './src/hooks/useSupabaseTasks';
 import { QuestionsProvider, useQuestions } from './src/contexts/QuestionsContext';
 import { ChecklistProvider, useChecklistContext } from './src/contexts/ChecklistContext';
+import { supabase } from './src/integrations/supabase/client';
+import { Auth } from '@supabase/auth-ui-react';
+import { ThemeSupa } from '@supabase/auth-ui-shared';
+import type { Session } from '@supabase/supabase-js';
 
 // --- CONTEXT for Global State ---
 const TasksContext = createContext<TasksContextType | null>(null);
@@ -18,7 +22,6 @@ const ThemeContext = createContext<ThemeContextType | null>(null);
 // --- LAYOUT & NAVIGATION ---
 
 const Sidebar: React.FC = () => {
-    const navigate = useNavigate();
     const { user } = useContext(UserContext)!;
     const navItems = [
         { path: '/dashboard', label: 'Dashboard', icon: DashboardIcon },
@@ -28,6 +31,10 @@ const Sidebar: React.FC = () => {
 
     const activeLinkClass = "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200";
     const inactiveLinkClass = "text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200";
+
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+    };
 
     return (
         <aside className="w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col h-full">
@@ -60,7 +67,7 @@ const Sidebar: React.FC = () => {
                      </div>
                 </div>
                 <button 
-                    onClick={() => navigate('/')} 
+                    onClick={handleLogout} 
                     className="w-full flex items-center justify-center space-x-2 px-3 py-2.5 rounded-lg font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900 dark:hover:text-red-300 transition"
                 >
                     <LogOutIcon className="w-5 h-5"/>
@@ -223,53 +230,35 @@ const Notification: React.FC<{ message: string; type: 'success' | 'error' | 'inf
 // --- SCREENS ---
 
 const LoginScreen: React.FC = () => {
-    const navigate = useNavigate();
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-
-    const handleLogin = (e: React.FormEvent) => {
-        e.preventDefault();
-        navigate('/dashboard');
-    };
-
     return (
         <div className="flex items-center justify-center h-screen bg-slate-50 dark:bg-slate-950">
             <div className="p-8 bg-white dark:bg-slate-900 rounded-xl shadow-lg max-w-sm w-full m-4">
                 <div className="text-center mb-8">
                     <ClipboardIcon className="w-16 h-16 text-blue-600 dark:text-blue-400 mx-auto mb-4" />
-                    <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-200">Bem-vindo de volta!</h1>
-                    <p className="text-slate-500 dark:text-slate-400">Faça login para continuar.</p>
+                    <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-200">Bem-vindo!</h1>
+                    <p className="text-slate-500 dark:text-slate-400">Faça login ou cadastre-se para continuar.</p>
                 </div>
-                <form onSubmit={handleLogin} className="space-y-6">
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Email</label>
-                        <input
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            placeholder="seu@email.com"
-                            className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition text-slate-800 dark:text-slate-200"
-                            required
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Senha</label>
-                        <input
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder="********"
-                            className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition text-slate-800 dark:text-slate-200"
-                            required
-                        />
-                    </div>
-                    <button
-                        type="submit"
-                        className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg transition text-lg flex items-center justify-center gap-2"
-                    >
-                        Entrar
-                    </button>
-                </form>
+                <Auth
+                    supabaseClient={supabase}
+                    appearance={{ theme: ThemeSupa }}
+                    providers={[]}
+                    localization={{
+                        variables: {
+                            sign_in: {
+                                email_label: 'Seu email',
+                                password_label: 'Sua senha',
+                                button_label: 'Entrar',
+                                link_text: 'Já tem uma conta? Entre',
+                            },
+                            sign_up: {
+                                email_label: 'Seu email',
+                                password_label: 'Crie uma senha',
+                                button_label: 'Cadastrar',
+                                link_text: 'Não tem uma conta? Cadastre-se',
+                            },
+                        },
+                    }}
+                />
             </div>
         </div>
     );
@@ -1680,39 +1669,66 @@ const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 // --- MAIN APP ---
 
 const App: React.FC = () => {
+    const [session, setSession] = useState<Session | null>(null);
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setSession(session);
+        });
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setSession(session);
+        });
+
+        return () => subscription.unsubscribe();
+    }, []);
+
+    useEffect(() => {
+        if (session) {
+            navigate('/dashboard');
+        } else {
+            navigate('/');
+        }
+    }, [session, navigate]);
+
     return (
-        <HashRouter>
-            <NotificationProvider>
-                <ThemeProvider>
-                <UserProvider>
-                <PatientsProvider>
-                <TasksProvider>
-                <QuestionsProvider>
-                <ChecklistProvider>
-                    <Routes>
-                        <Route path="/" element={<LoginScreen />} />
-                        <Route path="/" element={<AppLayout />}>
-                            <Route path="dashboard" element={<DashboardScreen />} />
-                            <Route path="patients" element={<PatientListScreen />} />
-                            <Route path="patient/:patientId" element={<PatientDetailScreen />} />
-                            <Route path="patient/:patientId/history" element={<PatientHistoryScreen />} />
-                            <Route path="patient/:patientId/round/categories" element={<RoundCategoryListScreen />} />
-                            <Route path="patient/:patientId/round/category/:categoryId" element={<ChecklistScreen />} />
-                            <Route path="patient/:patientId/round/category/:categoryId/create-alert" element={<CreateAlertScreen />} />
-                            <Route path="patient/:patientId/create-alert" element={<CreateAlertScreen />} />
-                            <Route path="status/:status" element={<TaskStatusScreen />} />
-                            <Route path="settings" element={<SettingsScreen />} />
-                        </Route>
-                    </Routes>
-                </ChecklistProvider>
-                </QuestionsProvider>
-                </TasksProvider>
-                </PatientsProvider>
-                </UserProvider>
-                </ThemeProvider>
-            </NotificationProvider>
-        </HashRouter>
+        <Routes>
+            <Route path="/" element={<LoginScreen />} />
+            <Route path="/" element={session ? <AppLayout /> : <Navigate to="/" />}>
+                <Route path="dashboard" element={<DashboardScreen />} />
+                <Route path="patients" element={<PatientListScreen />} />
+                <Route path="patient/:patientId" element={<PatientDetailScreen />} />
+                <Route path="patient/:patientId/history" element={<PatientHistoryScreen />} />
+                <Route path="patient/:patientId/round/categories" element={<RoundCategoryListScreen />} />
+                <Route path="patient/:patientId/round/category/:categoryId" element={<ChecklistScreen />} />
+                <Route path="patient/:patientId/round/category/:categoryId/create-alert" element={<CreateAlertScreen />} />
+                <Route path="patient/:patientId/create-alert" element={<CreateAlertScreen />} />
+                <Route path="status/:status" element={<TaskStatusScreen />} />
+                <Route path="settings" element={<SettingsScreen />} />
+            </Route>
+        </Routes>
     );
 }
 
-export default App;
+const Root: React.FC = () => (
+    <HashRouter>
+        <NotificationProvider>
+            <ThemeProvider>
+                <UserProvider>
+                    <PatientsProvider>
+                        <TasksProvider>
+                            <QuestionsProvider>
+                                <ChecklistProvider>
+                                    <App />
+                                </ChecklistProvider>
+                            </QuestionsProvider>
+                        </TasksProvider>
+                    </PatientsProvider>
+                </UserProvider>
+            </ThemeProvider>
+        </NotificationProvider>
+    </HashRouter>
+);
+
+export default Root;
