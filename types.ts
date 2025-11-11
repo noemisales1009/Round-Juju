@@ -40,7 +40,7 @@ export interface Patient {
 
 export interface Category {
   id: number;
-  name: string;
+  name:string;
   icon?: React.FC<{className?: string;}>;
 }
 
@@ -73,7 +73,6 @@ export interface Task {
   responsible: string;
   deadline: string; // ISO String for date and time
   status: TaskStatus;
-  originalStatus?: TaskStatus;
   justification?: string;
 }
 
@@ -86,19 +85,6 @@ export interface User {
 
 export type Theme = 'light' | 'dark';
 
-// --- NOVOS TIPOS PARA CATEGORIAS DINÂMICAS ---
-export interface DynamicCategory {
-  id: number;
-  nome: string;
-  icone?: string;
-}
-
-export interface DynamicQuestion {
-  id: number;
-  texto: string;
-  categoria_id: number;
-  ordem: number;
-}
 
 // --- CONTEXT TYPE DEFINITIONS ---
 
@@ -134,30 +120,11 @@ export interface NotificationContextType {
 }
 
 export interface UserContextType {
-    user: User | null;
-    loading: boolean;
-    signIn: (email: string, password: string) => Promise<any>;
-    signUp: (email: string, password: string) => Promise<any>;
-    signOut: () => Promise<void>;
+    user: User;
+    updateUser: (userData: Partial<User>) => void;
 }
 
 export interface ThemeContextType {
     theme: Theme;
     toggleTheme: () => void;
-}
-
-// --- CONTEXT PARA PERGUNTAS DINÂMICAS ---
-export interface QuestionsContextType {
-  questions: Question[];
-  loading: boolean;
-  categories: DynamicCategory[];
-}
-
-// --- CONTEXT PARA RESPOSTAS DO CHECKLIST ---
-export interface ChecklistContextType {
-  currentAnswers: ChecklistAnswer;
-  completionData: Record<number, number[]>;
-  loading: boolean;
-  loadAnswersForChecklist: (patientId: number, categoryId: number) => Promise<void>;
-  saveAnswer: (patientId: number, categoryId: number, questionId: number, answer: Answer) => Promise<void>;
 }
