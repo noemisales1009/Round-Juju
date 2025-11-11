@@ -404,6 +404,9 @@ const PatientListScreen: React.FC = () => {
     const { patients, loading } = useContext(PatientsContext)!;
     const [searchTerm, setSearchTerm] = useState('');
 
+    console.log('🔍 PatientListScreen - patients:', patients);
+    console.log('🔍 PatientListScreen - loading:', loading);
+
     const filteredPatients = useMemo(() => {
         return patients.filter(p => 
             p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -924,6 +927,7 @@ const AddDeviceModal: React.FC<{ patientId: number; onClose: () => void;}> = ({ 
             return;
         }
         try {
+            console.log('🟢 Modal - Chamando addDeviceToPatient com:', { patientId, type, location, startDate });
             await addDeviceToPatient(patientId, { name: type, location, startDate });
             showNotification({ message: 'Dispositivo cadastrado com sucesso!', type: 'success' });
             onClose();
@@ -1622,6 +1626,8 @@ const SettingsScreen: React.FC = () => {
 
 const PatientsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const supabaseHook = useSupabasePatients();
+    
+    console.log('🔵 PatientsProvider - supabaseHook:', supabaseHook);
 
     return <PatientsContext.Provider value={supabaseHook as PatientsContextType}>{children}</PatientsContext.Provider>;
 };
