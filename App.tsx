@@ -1751,6 +1751,7 @@ const ChecklistProvider: React.FC<{ children: React.ReactNode }> = ({ children }
 const PatientsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [patients, setPatients] = useState<Patient[]>([]);
     const [loading, setLoading] = useState(true);
+    const { showNotification } = useContext(NotificationContext)!;
 
     const fetchPatients = async () => {
         setLoading(true);
@@ -1788,21 +1789,43 @@ const PatientsProvider: React.FC<{ children: React.ReactNode }> = ({ children })
     }, []);
 
     const addDeviceToPatient = async (patientId: string, device: Omit<Device, 'id' | 'patient_id'>) => {
-        const { data, error } = await supabase.from('devices').insert([{ ...device, patient_id: patientId, start_date: device.startDate }]).select();
-        if (error) console.error("Error adding device:", error);
-        else if (data) fetchPatients();
+        const { data, error } = await supabase.from('devices').insert([{ 
+            patient_id: patientId,
+            name: device.name,
+            location: device.location,
+            start_date: device.startDate
+        }]).select();
+        if (error) {
+            console.error("Error adding device:", error);
+            showNotification({ message: 'Erro ao salvar dispositivo.', type: 'error' });
+        } else if (data) {
+            fetchPatients();
+        }
     };
 
     const addExamToPatient = async (patientId: string, exam: Omit<Exam, 'id' | 'patient_id'>) => {
         const { data, error } = await supabase.from('exams').insert([{ ...exam, patient_id: patientId }]).select();
-        if (error) console.error("Error adding exam:", error);
-        else if (data) fetchPatients();
+        if (error) {
+            console.error("Error adding exam:", error);
+            showNotification({ message: 'Erro ao salvar exame.', type: 'error' });
+        } else if (data) {
+            fetchPatients();
+        }
     };
 
     const addMedicationToPatient = async (patientId: string, medication: Omit<Medication, 'id' | 'patient_id'>) => {
-        const { data, error } = await supabase.from('medications').insert([{ ...medication, patient_id: patientId, start_date: medication.startDate }]).select();
-        if (error) console.error("Error adding medication:", error);
-        else if (data) fetchPatients();
+        const { data, error } = await supabase.from('medications').insert([{ 
+            patient_id: patientId,
+            name: medication.name,
+            dosage: medication.dosage,
+            start_date: medication.startDate
+        }]).select();
+        if (error) {
+            console.error("Error adding medication:", error);
+            showNotification({ message: 'Erro ao salvar medicação.', type: 'error' });
+        } else if (data) {
+            fetchPatients();
+        }
     };
 
     const addRemovalDateToDevice = async (patientId: string, deviceId: string, removalDate: string) => {
