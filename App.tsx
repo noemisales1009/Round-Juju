@@ -1363,14 +1363,14 @@ const CreateAlertScreen: React.FC = () => {
 
     useHeader(category ? `Alerta: ${category.name}` : 'Criar Alerta');
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!patientId || !description || !responsible || !deadline) return;
 
         const deadlineHours = parseInt(deadline.split(' ')[0]);
         const deadlineDate = new Date(Date.now() + deadlineHours * 60 * 60 * 1000).toISOString();
 
-        addTask({
+        const success = await addTask({
             patientId: patientId,
             categoryId: category ? category.id : 0, // 0 for general alerts
             description,
@@ -1378,12 +1378,14 @@ const CreateAlertScreen: React.FC = () => {
             deadline: deadlineDate,
         });
 
-        showNotification({ message: 'Alerta criado com sucesso!', type: 'success' });
-        
-        if (categoryId) {
-            navigate(`/patient/${patientId}/round/category/${categoryId}`);
-        } else {
-            navigate(`/patient/${patientId}`);
+        if (success) {
+            showNotification({ message: 'Alerta criado com sucesso!', type: 'success' });
+            
+            if (categoryId) {
+                navigate(`/patient/${patientId}/round/category/${categoryId}`);
+            } else {
+                navigate(`/patient/${patientId}`);
+            }
         }
     };
     
@@ -1861,12 +1863,14 @@ const PatientsProvider: React.FC<{ children: React.ReactNode }> = ({ children })
 const TasksProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(true);
+    const { showNotification } = useContext(NotificationContext)!;
 
     const fetchTasks = async () => {
         setLoading(true);
         const { data, error } = await supabase.from('tasks_status_view').select('*');
         if (error) {
             console.error("Error fetching tasks:", error);
+            showNotification({ message: 'Erro ao carregar tarefas.', type: 'error' });
         } else {
             const formattedTasks = data.map(t => ({
                 ...t,
@@ -1884,17 +1888,27 @@ const TasksProvider: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
     const updateTaskJustification = async (taskId: string, justification: string) => {
         const { error } = await supabase.from('tasks').update({ justification }).eq('id', taskId);
-        if (error) console.error("Error updating task justification:", error);
-        else fetchTasks();
+        if (error) {
+            console.error("Error updating task justification:", error);
+            showNotification({ message: 'Erro ao salvar justificativa.', type: 'error' });
+        } else {
+            showNotification({ message: 'Justificativa salva com sucesso!', type: 'success' });
+            fetchTasks();
+        }
     };
     
      const updateTaskStatus = async (taskId: string, status: TaskStatus) => {
         const { error } = await supabase.from('tasks').update({ status }).eq('id', taskId);
-        if (error) console.error("Error updating task status:", error);
-        else fetchTasks();
+        if (error) {
+            console.error("Error updating task status:", error);
+            showNotification({ message: 'Erro ao concluir tarefa.', type: 'error' });
+        } else {
+            showNotification({ message: 'Tarefa concluída com sucesso!', type: 'success' });
+            fetchTasks();
+        }
     };
 
-    const addTask = async (taskData: Omit<Task, 'id' | 'status' | 'justification' | 'live_status'>) => {
+    const addTask = async (taskData: Omit<Task, 'id' | 'status' | 'justification' | 'live_status'>): Promise<boolean> => {
         const { error } = await supabase.from('tasks').insert([{
             patient_id: taskData.patientId,
             category_id: taskData.categoryId,
@@ -1903,8 +1917,14 @@ const TasksProvider: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             deadline: taskData.deadline,
             status: 'alerta'
         }]);
-        if (error) console.error("Error adding task:", error);
-        else fetchTasks();
+        if (error) {
+            console.error("Error adding task:", error);
+            showNotification({ message: `Erro ao criar alerta: ${error.message}`, type: 'error' });
+            return false;
+        } else {
+            fetchTasks();
+            return true;
+        }
     };
 
     const value = {

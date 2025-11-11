@@ -106,7 +106,7 @@ export interface TasksContextType {
   tasks: Task[];
   updateTaskJustification: (taskId: string, justification: string) => void;
   updateTaskStatus: (taskId: string, status: TaskStatus) => void;
-  addTask: (taskData: Omit<Task, 'id' | 'status' | 'justification' | 'live_status'>) => void;
+  addTask: (taskData: Omit<Task, 'id' | 'status' | 'justification' | 'live_status'>) => Promise<boolean>;
   loading: boolean;
 }
 
