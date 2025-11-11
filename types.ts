@@ -40,7 +40,7 @@ export interface Patient {
 
 export interface Category {
   id: number;
-  name:string;
+  name: string;
   icon?: React.FC<{className?: string;}>;
 }
 
@@ -85,6 +85,19 @@ export interface User {
 
 export type Theme = 'light' | 'dark';
 
+// --- NOVOS TIPOS PARA CATEGORIAS DINÂMICAS ---
+export interface DynamicCategory {
+  id: number;
+  nome: string;
+  icone?: string;
+}
+
+export interface DynamicQuestion {
+  id: number;
+  texto: string;
+  categoria_id: number;
+  ordem: number;
+}
 
 // --- CONTEXT TYPE DEFINITIONS ---
 
@@ -127,4 +140,11 @@ export interface UserContextType {
 export interface ThemeContextType {
     theme: Theme;
     toggleTheme: () => void;
+}
+
+// --- CONTEXT PARA PERGUNTAS DINÂMICAS ---
+export interface QuestionsContextType {
+  questions: Question[];
+  loading: boolean;
+  categories: DynamicCategory[];
 }
