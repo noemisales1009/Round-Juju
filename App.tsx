@@ -6,6 +6,7 @@ import { BackArrowIcon, PlusIcon, WarningIcon, ClockIcon, AlertIcon, CheckCircle
 import { useSupabasePatients } from './src/hooks/useSupabasePatients';
 import { useSupabaseTasks } from './src/hooks/useSupabaseTasks';
 import { QuestionsProvider, useQuestions } from './src/contexts/QuestionsContext';
+import { ChecklistProvider, useChecklistContext } from './src/contexts/ChecklistContext';
 
 // --- CONTEXT for Global State ---
 const TasksContext = createContext<TasksContextType | null>(null);
@@ -13,54 +14,6 @@ const PatientsContext = createContext<PatientsContextType | null>(null);
 const NotificationContext = createContext<NotificationContextType | null>(null);
 const UserContext = createContext<UserContextType | null>(null);
 const ThemeContext = createContext<ThemeContextType | null>(null);
-
-
-// --- LOCAL STORAGE HELPERS for checklist completion ---
-
-const getTodayDateString = () => new Date().toISOString().split('T')[0];
-
-const getCompletedChecklists = (): Record<string, Record<string, number[]>> => {
-  try {
-    const data = localStorage.getItem('completedChecklists');
-    return data ? JSON.parse(data) : {};
-  } catch (error) {
-    console.error("Failed to parse completed checklists from localStorage", error);
-    return {};
-  }
-};
-
-const saveCompletedChecklists = (data: Record<string, Record<string, number[]>>) => {
-  try {
-    localStorage.setItem('completedChecklists', JSON.stringify(data));
-  } catch (error) {
-    console.error("Failed to save completed checklists to localStorage", error);
-  }
-};
-
-const getCompletedCategoriesForPatient = (patientId: string): number[] => {
-  const today = getTodayDateString();
-  const allCompleted = getCompletedChecklists();
-  return allCompleted[patientId]?.[today] || [];
-};
-
-const markCategoryAsCompletedForPatient = (patientId: string, categoryId: number) => {
-  const today = getTodayDateString();
-  const allCompleted = getCompletedChecklists();
-  
-  if (!allCompleted[patientId]) {
-    allCompleted[patientId] = {};
-  }
-  if (!allCompleted[patientId][today]) {
-    allCompleted[patientId][today] = [];
-  }
-
-  if (!allCompleted[patientId][today].includes(categoryId)) {
-    allCompleted[patientId][today].push(categoryId);
-  }
-
-  saveCompletedChecklists(allCompleted);
-};
-
 
 // --- LAYOUT & NAVIGATION ---
 
@@ -407,7 +360,8 @@ const DashboardScreen: React.FC = () => {
 
 const PatientListScreen: React.FC = () => {
     useHeader('Leitos');
-    const { patients, loading } = useContext(PatientsContext)!;
+    const { patients, loading: patientsLoading } = useContext(PatientsContext)!;
+    const { completionData, loading: checklistLoading } = useChecklistContext();
     const [searchTerm, setSearchTerm] = useState('');
 
     const filteredPatients = useMemo(() => {
@@ -418,11 +372,11 @@ const PatientListScreen: React.FC = () => {
     }, [patients, searchTerm]);
     
     const calculateProgress = (patientId: number) => {
-        const completed = getCompletedCategoriesForPatient(patientId.toString());
+        const completed = completionData[patientId] || [];
         return (completed.length / CATEGORIES.length) * 100;
     };
 
-    if (loading) {
+    if (patientsLoading || checklistLoading) {
         return <div className="text-center py-8 text-slate-500 dark:text-slate-400">Carregando pacientes...</div>;
     }
 
@@ -930,7 +884,6 @@ const AddDeviceModal: React.FC<{ patientId: number; onClose: () => void;}> = ({ 
             return;
         }
         try {
-            console.log('🟢 Modal - Chamando addDeviceToPatient com:', { patientId, type, location, startDate });
             await addDeviceToPatient(patientId, { name: type, location, startDate });
             showNotification({ message: 'Dispositivo cadastrado com sucesso!', type: 'success' });
             onClose();
@@ -1201,13 +1154,14 @@ const AddEndDateModal: React.FC<{ medicationId: number, patientId: number, onClo
 const RoundCategoryListScreen: React.FC = () => {
     const { patientId } = useParams<{ patientId: string }>();
     const { patients } = useContext(PatientsContext)!;
+    const { completionData } = useChecklistContext();
     const patient = patients.find(p => p.id.toString() === patientId);
 
     useHeader('Round: Categorias');
     
     if (!patientId || !patient) return <p>Paciente não encontrado.</p>;
 
-    const completedCategories = getCompletedCategoriesForPatient(patientId);
+    const completedCategories = completionData[parseInt(patientId)] || [];
 
     return (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -1235,7 +1189,9 @@ const RoundCategoryListScreen: React.FC = () => {
 const ChecklistScreen: React.FC = () => {
     const { patientId, categoryId } = useParams<{ patientId: string, categoryId: string }>();
     const { patients } = useContext(PatientsContext)!;
-    const { questions } = useQuestions(); // Usar perguntas dinâmicas
+    const { questions } = useQuestions();
+    const { currentAnswers, loadAnswersForChecklist, saveAnswer, loading } = useChecklistContext();
+    const { showNotification } = useContext(NotificationContext)!;
     
     const patient = patients.find(p => p.id.toString() === patientId);
     const category = CATEGORIES.find(c => c.id.toString() === categoryId);
@@ -1246,22 +1202,22 @@ const ChecklistScreen: React.FC = () => {
 
     useHeader(category ? `Checklist: ${category.name}` : 'Checklist');
 
-    const [answers, setAnswers] = useState<ChecklistAnswer>(() => {
-        const savedAnswers = localStorage.getItem(`checklist_${patientId}_${categoryId}`);
-        return savedAnswers ? JSON.parse(savedAnswers) : {};
-    });
-
     useEffect(() => {
-        localStorage.setItem(`checklist_${patientId}_${categoryId}`, JSON.stringify(answers));
-    }, [answers, patientId, categoryId]);
+        if (patientId && categoryId) {
+            loadAnswersForChecklist(parseInt(patientId), parseInt(categoryId));
+        }
+    }, [patientId, categoryId, loadAnswersForChecklist]);
 
-    const handleAnswer = (questionId: number, answer: Answer) => {
-        setAnswers(prev => ({ ...prev, [questionId]: answer }));
+    const handleAnswer = async (questionId: number, answer: Answer) => {
+        if (!patientId || !categoryId) return;
+        try {
+            await saveAnswer(parseInt(patientId), parseInt(categoryId), questionId, answer);
+        } catch (error) {
+            showNotification({ message: 'Erro ao salvar resposta.', type: 'error' });
+        }
     };
     
-    const handleSave = () => {
-        if (!patientId || !categoryId) return;
-        markCategoryAsCompletedForPatient(patientId, parseInt(categoryId));
+    const handleFinish = () => {
         navigate(`/patient/${patientId}/round/categories`);
     };
 
@@ -1269,7 +1225,7 @@ const ChecklistScreen: React.FC = () => {
         if (currentQuestionIndex < categoryQuestions.length - 1) {
             setCurrentQuestionIndex(prev => prev + 1);
         } else {
-            handleSave();
+            handleFinish();
         }
     };
 
@@ -1279,8 +1235,16 @@ const ChecklistScreen: React.FC = () => {
         }
     };
 
-    if (!patient || !category || categoryQuestions.length === 0) {
-        return <p>Paciente, categoria ou perguntas não encontrados.</p>;
+    if (!patient || !category) {
+        return <p>Paciente ou categoria não encontrados.</p>;
+    }
+    
+    if (loading) {
+        return <p>Carregando perguntas...</p>;
+    }
+
+    if (categoryQuestions.length === 0) {
+        return <p>Nenhuma pergunta encontrada para esta categoria.</p>;
     }
 
     const currentQuestion = categoryQuestions[currentQuestionIndex];
@@ -1300,7 +1264,7 @@ const ChecklistScreen: React.FC = () => {
                             key={answer}
                             onClick={() => handleAnswer(currentQuestion.id, answer)}
                             className={`w-full py-3.5 px-4 rounded-lg font-bold text-lg transition-all transform active:scale-95 ${
-                                answers[currentQuestion.id] === answer
+                                currentAnswers[currentQuestion.id] === answer
                                     ? 'bg-white text-blue-600 shadow-md ring-2 ring-white'
                                     : 'bg-blue-600 hover:bg-blue-700 text-white'
                             }`}
@@ -1321,7 +1285,7 @@ const ChecklistScreen: React.FC = () => {
                         onClick={handleNext}
                         className="bg-white text-blue-600 font-bold py-2 px-6 rounded-lg shadow-md hover:bg-slate-100 transition"
                     >
-                        {currentQuestionIndex === categoryQuestions.length - 1 ? 'Salvar' : 'Próximo'}
+                        {currentQuestionIndex === categoryQuestions.length - 1 ? 'Finalizar' : 'Próximo'}
                     </button>
                 </div>
             </div>
@@ -1630,18 +1594,12 @@ const SettingsScreen: React.FC = () => {
 
 const PatientsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const supabaseHook = useSupabasePatients();
-    
-    console.log('🔵 PatientsProvider - supabaseHook:', supabaseHook);
-
     return <PatientsContext.Provider value={supabaseHook as PatientsContextType}>{children}</PatientsContext.Provider>;
 };
 
 
 const TasksProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const supabaseHook = useSupabaseTasks();
-    
-    console.log('🔵 TasksProvider - supabaseHook:', supabaseHook);
-
     return <TasksContext.Provider value={supabaseHook as TasksContextType}>{children}</TasksContext.Provider>;
 };
 
@@ -1718,6 +1676,7 @@ const App: React.FC = () => {
                 <PatientsProvider>
                 <TasksProvider>
                 <QuestionsProvider>
+                <ChecklistProvider>
                     <Routes>
                         <Route path="/" element={<LoginScreen />} />
                         <Route path="/" element={<AppLayout />}>
@@ -1733,6 +1692,7 @@ const App: React.FC = () => {
                             <Route path="settings" element={<SettingsScreen />} />
                         </Route>
                     </Routes>
+                </ChecklistProvider>
                 </QuestionsProvider>
                 </TasksProvider>
                 </PatientsProvider>

@@ -148,3 +148,12 @@ export interface QuestionsContextType {
   loading: boolean;
   categories: DynamicCategory[];
 }
+
+// --- CONTEXT PARA RESPOSTAS DO CHECKLIST ---
+export interface ChecklistContextType {
+  currentAnswers: ChecklistAnswer;
+  completionData: Record<number, number[]>;
+  loading: boolean;
+  loadAnswersForChecklist: (patientId: number, categoryId: number) => Promise<void>;
+  saveAnswer: (patientId: number, categoryId: number, questionId: number, answer: Answer) => Promise<void>;
+}
