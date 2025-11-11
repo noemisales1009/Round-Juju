@@ -281,12 +281,17 @@ const DashboardScreen: React.FC = () => {
     const { tasks, loading } = useContext(TasksContext)!;
 
     const summaryData = useMemo(() => {
+        // Contar alertas com base no status original, excluindo os concluídos.
+        const alertCount = tasks.filter(t => t.originalStatus === 'alerta' && t.status !== 'concluido').length;
+        
+        // Usar o status de tempo real (live_status) para as outras contagens.
         const counts = tasks.reduce((acc, task) => {
             acc[task.status] = (acc[task.status] || 0) + 1;
             return acc;
         }, {} as Record<TaskStatus, number>);
+
         return [
-            { title: 'Alertas', count: counts.alerta || 0, icon: WarningIcon, color: 'text-yellow-500', bgColor: 'bg-yellow-100 dark:bg-yellow-900/50', status: 'alerta' },
+            { title: 'Alertas', count: alertCount, icon: WarningIcon, color: 'text-yellow-500', bgColor: 'bg-yellow-100 dark:bg-yellow-900/50', status: 'alerta' },
             { title: 'No Prazo', count: counts.no_prazo || 0, icon: ClockIcon, color: 'text-blue-500', bgColor: 'bg-blue-100 dark:bg-blue-900/50', status: 'no_prazo' },
             { title: 'Fora do Prazo', count: counts.fora_do_prazo || 0, icon: AlertIcon, color: 'text-red-500', bgColor: 'bg-red-100 dark:bg-red-900/50', status: 'fora_do_prazo' },
             { title: 'Concluídos', count: counts.concluido || 0, icon: CheckCircleIcon, color: 'text-green-500', bgColor: 'bg-green-100 dark:bg-green-900/50', status: 'concluido' },
@@ -294,7 +299,7 @@ const DashboardScreen: React.FC = () => {
     }, [tasks]);
 
     const alertChartData = useMemo(() => {
-        const counts = tasks.filter(t => t.status === 'alerta').reduce((acc, task) => {
+        const counts = tasks.filter(t => t.originalStatus === 'alerta' && t.status !== 'concluido').reduce((acc, task) => {
             acc[task.categoryId] = (acc[task.categoryId] || 0) + 1;
             return acc;
         }, {} as Record<string, number>);
@@ -502,7 +507,7 @@ const PatientHistoryScreen: React.FC = () => {
             });
         });
 
-        const patientAlerts = tasks.filter(task => task.patientId === patient.id && task.status === 'alerta');
+        const patientAlerts = tasks.filter(task => task.patientId === patient.id && task.originalStatus === 'alerta');
         patientAlerts.forEach(alert => {
             events.push({
                 timestamp: alert.deadline,
@@ -1399,7 +1404,14 @@ const TaskStatusScreen: React.FC = () => {
 
     const [justificationModal, setJustificationModal] = useState<Task | null>(null);
 
-    const filteredTasks = tasks.filter((t: Task) => t.status === status);
+    const filteredTasks = tasks.filter((t: Task) => {
+        if (status === 'alerta') {
+            // Para a página 'alerta', filtramos pelo status original, e a tarefa não pode estar concluída.
+            return t.originalStatus === 'alerta' && t.status !== 'concluido';
+        }
+        // Para as outras páginas, filtramos pelo status de tempo (live_status).
+        return t.status === status;
+    });
     
     const statusConfig = {
         alerta: { title: 'Alertas', icon: WarningIcon, color: 'yellow' },

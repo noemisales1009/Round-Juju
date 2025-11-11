@@ -73,6 +73,7 @@ export interface Task {
   responsible: string;
   deadline: string; // ISO String for date and time
   status: TaskStatus;
+  originalStatus?: TaskStatus;
   justification?: string;
 }
 

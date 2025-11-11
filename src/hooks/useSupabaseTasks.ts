@@ -30,7 +30,8 @@ export const useSupabaseTasks = () => {
         description: t.description,
         responsible: t.responsible,
         deadline: t.deadline,
-        status: t.live_status as TaskStatus, // Usando o status em tempo real da view
+        status: t.live_status as TaskStatus, // Usando o status de tempo real da view
+        originalStatus: t.original_status as TaskStatus, // Guardando o status original
         justification: t.justification || undefined,
       }));
 
