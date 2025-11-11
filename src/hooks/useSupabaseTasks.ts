@@ -9,19 +9,19 @@ export const useSupabaseTasks = () => {
   const loadTasks = async () => {
     try {
       setLoading(true);
-      console.log('🔄 Carregando tarefas do Supabase...');
+      console.log('🔄 Carregando tarefas da view `tasks_status_view`...');
 
       const { data: tasksData, error } = await supabase
-        .from('tasks')
+        .from('tasks_status_view') // Usando a view com status em tempo real
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('❌ Erro ao buscar tarefas:', error);
+        console.error('❌ Erro ao buscar tarefas da view:', error);
         throw error;
       }
 
-      console.log('✅ Tarefas do Supabase:', tasksData);
+      console.log('✅ Tarefas da view:', tasksData);
 
       const formattedTasks: Task[] = (tasksData || []).map((t, index) => ({
         id: index + 1,
@@ -30,11 +30,11 @@ export const useSupabaseTasks = () => {
         description: t.description,
         responsible: t.responsible,
         deadline: t.deadline,
-        status: t.status as TaskStatus,
+        status: t.live_status as TaskStatus, // Usando o status em tempo real da view
         justification: t.justification || undefined,
       }));
 
-      console.log('✅ Tarefas formatadas:', formattedTasks);
+      console.log('✅ Tarefas formatadas com status ao vivo:', formattedTasks);
       setTasks(formattedTasks);
     } catch (error) {
       console.error('❌ Erro ao carregar tarefas:', error);
