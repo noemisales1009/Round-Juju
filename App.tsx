@@ -8,8 +8,6 @@ import { useSupabaseTasks } from './src/hooks/useSupabaseTasks';
 import { QuestionsProvider, useQuestions } from './src/contexts/QuestionsContext';
 import { ChecklistProvider, useChecklistContext } from './src/contexts/ChecklistContext';
 import { supabase } from './src/integrations/supabase/client';
-import { Auth } from '@supabase/auth-ui-react';
-import { ThemeSupa } from '@supabase/auth-ui-shared';
 import type { Session } from '@supabase/supabase-js';
 
 // --- CONTEXT for Global State ---
@@ -230,35 +228,76 @@ const Notification: React.FC<{ message: string; type: 'success' | 'error' | 'inf
 // --- SCREENS ---
 
 const LoginScreen: React.FC = () => {
+    const [isSignUp, setIsSignUp] = useState(false);
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState<string | null>(null);
+    const { showNotification } = useContext(NotificationContext)!;
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError(null);
+
+        if (isSignUp) {
+            const { error } = await supabase.auth.signUp({ email, password });
+            if (error) {
+                setError(error.message);
+            } else {
+                showNotification({ message: 'Cadastro realizado! Verifique seu email.', type: 'success' });
+                setIsSignUp(false); // Switch to login view
+            }
+        } else {
+            const { error } = await supabase.auth.signInWithPassword({ email, password });
+            if (error) {
+                setError(error.message);
+            }
+            // The onAuthStateChange listener in App.tsx will handle navigation
+        }
+    };
+
     return (
         <div className="flex items-center justify-center h-screen bg-slate-50 dark:bg-slate-950">
             <div className="p-8 bg-white dark:bg-slate-900 rounded-xl shadow-lg max-w-sm w-full m-4">
                 <div className="text-center mb-8">
                     <ClipboardIcon className="w-16 h-16 text-blue-600 dark:text-blue-400 mx-auto mb-4" />
-                    <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-200">Bem-vindo!</h1>
-                    <p className="text-slate-500 dark:text-slate-400">Faça login ou cadastre-se para continuar.</p>
+                    <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-200">
+                        {isSignUp ? 'Crie sua conta' : 'Bem-vindo!'}
+                    </h1>
+                    <p className="text-slate-500 dark:text-slate-400">
+                        {isSignUp ? 'Preencha os campos para se cadastrar.' : 'Faça login para continuar.'}
+                    </p>
                 </div>
-                <Auth
-                    supabaseClient={supabase}
-                    appearance={{ theme: ThemeSupa }}
-                    providers={[]}
-                    localization={{
-                        variables: {
-                            sign_in: {
-                                email_label: 'Seu email',
-                                password_label: 'Sua senha',
-                                button_label: 'Entrar',
-                                link_text: 'Já tem uma conta? Entre',
-                            },
-                            sign_up: {
-                                email_label: 'Seu email',
-                                password_label: 'Crie uma senha',
-                                button_label: 'Cadastrar',
-                                link_text: 'Não tem uma conta? Cadastre-se',
-                            },
-                        },
-                    }}
-                />
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Email</label>
+                        <input
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            required
+                            className="mt-1 block w-full border bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-slate-800 dark:text-slate-200"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Senha</label>
+                        <input
+                            type="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            required
+                            className="mt-1 block w-full border bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-slate-800 dark:text-slate-200"
+                        />
+                    </div>
+                    {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+                    <button type="submit" className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2.5 px-4 rounded-lg transition">
+                        {isSignUp ? 'Cadastrar' : 'Entrar'}
+                    </button>
+                </form>
+                <div className="text-center mt-4">
+                    <button onClick={() => { setIsSignUp(!isSignUp); setError(null); }} className="text-sm text-blue-600 hover:underline dark:text-blue-400">
+                        {isSignUp ? 'Já tem uma conta? Entre' : 'Não tem uma conta? Cadastre-se'}
+                    </button>
+                </div>
             </div>
         </div>
     );
