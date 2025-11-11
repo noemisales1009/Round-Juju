@@ -65,7 +65,12 @@ export const ALERT_DEADLINES: string[] = [
     '1 hora', 
     '2 horas', 
     '3 horas', 
-    '4 horas'
+    '4 horas',
+    '8 horas',
+    '12 horas',
+    '16 horas',
+    '20 horas',
+    '24 horas'
 ];
 
 export const INITIAL_USER: User = {
