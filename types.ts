@@ -134,8 +134,11 @@ export interface NotificationContextType {
 }
 
 export interface UserContextType {
-    user: User;
-    updateUser: (userData: Partial<User>) => void;
+    user: User | null;
+    loading: boolean;
+    signIn: (email: string, password: string) => Promise<any>;
+    signUp: (email: string, password: string) => Promise<any>;
+    signOut: () => Promise<void>;
 }
 
 export interface ThemeContextType {
