@@ -61,17 +61,7 @@ export const RESPONSIBLES: string[] = [
     'Médico / Fisioterapeuta'
 ];
 
-export const ALERT_DEADLINES: string[] = [
-    '1 hora', 
-    '2 horas', 
-    '3 horas', 
-    '4 horas',
-    '8 horas',
-    '12 horas',
-    '16 horas',
-    '20 horas',
-    '24 horas'
-];
+export const ALERT_DEADLINES: string[] = Array.from({ length: 24 }, (_, i) => `${i + 1} hora${i > 0 ? 's' : ''}`);
 
 export const INITIAL_USER: User = {
     name: 'Usuário',
