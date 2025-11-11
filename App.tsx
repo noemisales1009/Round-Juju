@@ -1372,7 +1372,7 @@ const CreateAlertScreen: React.FC = () => {
 
         const success = await addTask({
             patientId: patientId,
-            categoryId: category ? category.id : 0, // 0 for general alerts
+            categoryId: category ? category.id : null,
             description,
             responsible,
             deadline: deadlineDate,
@@ -1484,7 +1484,7 @@ const TaskStatusScreen: React.FC = () => {
         <div className="space-y-4">
             {filteredTasks.map((task: Task) => {
                 const patient = patients.find((p: Patient) => p.id === task.patientId);
-                const category = CATEGORIES.find(c => c.id === task.categoryId);
+                const category = task.categoryId ? CATEGORIES.find(c => c.id === task.categoryId) : null;
                 const currentTaskConfig = statusConfig[task.live_status as TaskStatus] || config;
 
                 return (
@@ -1495,7 +1495,7 @@ const TaskStatusScreen: React.FC = () => {
                                 <p className="text-sm text-slate-500 dark:text-slate-400">
                                     <Link to={`/patient/${patient?.id}`} className="hover:underline font-semibold">{patient?.name}</Link> - Leito {patient?.bedNumber}
                                 </p>
-                                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Responsável: {task.responsible} | Categoria: {category?.name}</p>
+                                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Responsável: {task.responsible} | Categoria: {category?.name || 'Geral'}</p>
                                 {task.justification && <p className="text-xs italic text-blue-600 dark:text-blue-400 mt-1">Justificativa: {task.justification}</p>}
                             </div>
                             <div className="text-right flex-shrink-0 ml-2">

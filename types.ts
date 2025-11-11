@@ -81,7 +81,7 @@ export type TaskStatus = 'alerta' | 'no_prazo' | 'fora_do_prazo' | 'concluido' |
 export interface Task {
   id: string;
   patientId: string;
-  categoryId: number;
+  categoryId: number | null;
   description: string;
   responsible: string;
   deadline: string; // ISO String for date and time
